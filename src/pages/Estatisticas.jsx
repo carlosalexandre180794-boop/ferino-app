@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
 import Artilharia from "../components/Artilharia";
 import GoleiroMes from "../components/GoleiroMes";
+import { escudoTime } from "../escudos";
 
 const CHAVE_ANO = "ferino_ano_ativo";
 const CHAVE_MES = "ferino_mes_ativo";
@@ -47,7 +48,10 @@ function Estatisticas() {
               gols_sofridos,
               ativo,
               times (
-                nome
+                nome,
+                pontos,
+                saldo,
+                gols_pro
               )
             `)
             .eq("ativo", true),
@@ -61,14 +65,10 @@ function Estatisticas() {
           }),
         ]);
 
-        if (respostaMensal.error) {
-          throw respostaMensal.error;
-        }
-
+        if (respostaMensal.error) throw respostaMensal.error;
         if (respostaArtilhariaAnual.error) {
           throw respostaArtilhariaAnual.error;
         }
-
         if (respostaGoleirosAnual.error) {
           throw respostaGoleirosAnual.error;
         }
@@ -83,6 +83,9 @@ function Estatisticas() {
             jogos: Number(jogador.jogos || 0),
             jogosGoleiro: Number(jogador.jogos_goleiro || 0),
             golsSofridos: Number(jogador.gols_sofridos || 0),
+            pontosTime: Number(jogador.times?.pontos || 0),
+            saldoTime: Number(jogador.times?.saldo || 0),
+            golsProTime: Number(jogador.times?.gols_pro || 0),
           })
         );
 
@@ -160,24 +163,15 @@ function Estatisticas() {
               : "0.00",
         }))
         .sort((a, b) => {
-          if (
-            a.jogosGoleiro > 0 &&
-            b.jogosGoleiro === 0
-          ) {
+          if (a.jogosGoleiro > 0 && b.jogosGoleiro === 0) {
             return -1;
           }
 
-          if (
-            a.jogosGoleiro === 0 &&
-            b.jogosGoleiro > 0
-          ) {
+          if (a.jogosGoleiro === 0 && b.jogosGoleiro > 0) {
             return 1;
           }
 
-          if (
-            a.jogosGoleiro > 0 &&
-            b.jogosGoleiro > 0
-          ) {
+          if (a.jogosGoleiro > 0 && b.jogosGoleiro > 0) {
             const mediaA =
               a.golsSofridos / a.jogosGoleiro;
             const mediaB =
@@ -187,14 +181,14 @@ function Estatisticas() {
               mediaA - mediaB ||
               a.golsSofridos - b.golsSofridos ||
               b.jogosGoleiro - a.jogosGoleiro ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
             );
           }
 
-          return a.nome.localeCompare(
-            b.nome,
-            "pt-BR"
-          );
+          return a.nome.localeCompare(b.nome, "pt-BR");
         }),
     [jogadoresMensais]
   );
@@ -208,6 +202,11 @@ function Estatisticas() {
     goleirosExibidos.find(
       (goleiro) => goleiro.jogosGoleiro > 0
     ) || null;
+
+  const artilheiroDestaque =
+    artilheirosExibidos.length > 0
+      ? artilheirosExibidos[0]
+      : null;
 
   const nomeMesAtivo = new Intl.DateTimeFormat(
     "pt-BR",
@@ -229,85 +228,44 @@ function Estatisticas() {
       : `Temporada ${anoAtivo}`;
 
   return (
-    <main className="page">
-      <section
-        className="page-header"
-        style={{
-          marginBottom: "20px",
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-          }}
-        >
-          Estatísticas
-        </h2>
+    <main className="page estatisticas-page">
+      <section className="page-header estatisticas-header">
+        <h2>Estatísticas</h2>
       </section>
 
       {mensagem && (
-        <div
-          style={{
-            padding: "12px 14px",
-            marginBottom: "18px",
-            background: "#4a1f2a",
-            borderLeft: "4px solid #ef4444",
-            borderRadius: "6px",
-            color: "#fff",
-          }}
-        >
+        <div className="estatisticas-erro">
           {mensagem}
         </div>
       )}
 
       {carregando ? (
-        <p
-          style={{
-            color: "#fff",
-            textAlign: "center",
-            marginTop: "40px",
-          }}
-        >
+        <p className="estatisticas-loading">
           Carregando estatísticas...
         </p>
       ) : (
         <>
-          <div
-            style={{
-              marginBottom: "12px",
-              maxWidth: "450px",
-            }}
-          >
-            <GoleiroMes goleiro={melhorGoleiro} />
-          </div>
+          <section className="estatisticas-destaques">
+            <GoleiroMes
+              tipo="goleiro"
+              goleiro={melhorGoleiro}
+            />
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "16px",
-              marginTop: "0",
-            }}
-          >
-            <div
-              className="side-column"
-              style={{ gap: "6px" }}
-            >
+            <GoleiroMes
+              tipo="artilheiro"
+              artilheiro={artilheiroDestaque}
+            />
+          </section>
+
+          <section className="estatisticas-rankings">
+            <div className="estatisticas-coluna">
               <CabecalhoRanking
                 titulo="Artilharia"
                 filtro={filtroArtilharia}
                 setFiltro={setFiltroArtilharia}
               />
 
-              <p
-                style={{
-                  color: "#94a3b8",
-                  margin: "0 0 6px",
-                  fontSize: "0.82rem",
-                  lineHeight: "1.1",
-                }}
-              >
+              <p className="estatisticas-periodo">
                 {periodoArtilharia}
               </p>
 
@@ -316,24 +274,14 @@ function Estatisticas() {
               />
             </div>
 
-            <div
-              className="side-column"
-              style={{ gap: "6px" }}
-            >
+            <div className="estatisticas-coluna">
               <CabecalhoRanking
                 titulo="Goleiros"
                 filtro={filtroGoleiros}
                 setFiltro={setFiltroGoleiros}
               />
 
-              <p
-                style={{
-                  color: "#94a3b8",
-                  margin: "0 0 6px",
-                  fontSize: "0.82rem",
-                  lineHeight: "1.1",
-                }}
-              >
+              <p className="estatisticas-periodo">
                 {periodoGoleiros}
               </p>
 
@@ -341,7 +289,7 @@ function Estatisticas() {
                 goleiros={goleirosExibidos}
               />
             </div>
-          </div>
+          </section>
         </>
       )}
     </main>
@@ -354,35 +302,10 @@ function CabecalhoRanking({
   setFiltro,
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "0",
-        gap: "10px",
-      }}
-    >
-      <h3
-        style={{
-          color: "#fff",
-          margin: 0,
-          fontSize: "1.12rem",
-          lineHeight: 1.1,
-        }}
-      >
-        {titulo}
-      </h3>
+    <div className="estatisticas-ranking-header">
+      <h3>{titulo}</h3>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "5px",
-          background: "#1e1e24",
-          padding: "3px",
-          borderRadius: "6px",
-        }}
-      >
+      <div className="estatisticas-filtros">
         <BotaoFiltro
           ativo={filtro === "mes"}
           onClick={() => setFiltro("mes")}
@@ -410,142 +333,82 @@ function BotaoFiltro({
     <button
       type="button"
       onClick={onClick}
-      style={{
-        background: ativo ? "#333" : "transparent",
-        color: "#fff",
-        border: "none",
-        padding: "6px 11px",
-        borderRadius: "4px",
-        cursor: "pointer",
-        fontWeight: ativo ? "bold" : "normal",
-      }}
+      className={
+        ativo
+          ? "estatisticas-filtro ativo"
+          : "estatisticas-filtro"
+      }
     >
       {children}
     </button>
   );
 }
 
-
 function TabelaGoleiros({ goleiros }) {
-  const colunas =
-    "28px minmax(92px, 1fr) 44px 58px 50px";
-
-  const estiloCabecalho = {
-    display: "grid",
-    gridTemplateColumns: colunas,
-    alignItems: "center",
-    gap: "4px",
-    padding: "10px 8px",
-    borderBottom: "2px solid #2a2a32",
-    color: "#7f8ba3",
-    fontSize: "0.62rem",
-    fontWeight: "bold",
-    letterSpacing: "0.04em",
-    textAlign: "center",
-  };
-
-  const estiloLinha = {
-    display: "grid",
-    gridTemplateColumns: colunas,
-    alignItems: "center",
-    gap: "4px",
-    minHeight: "68px",
-    padding: "10px 8px",
-    borderBottom: "1px solid #2a2a32",
-    fontSize: "0.82rem",
-    textAlign: "center",
-  };
-
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "100%",
-        overflow: "hidden",
-        color: "#fff",
-        background: "#1e1e24",
-        borderRadius: "8px",
-      }}
-    >
-      <div style={estiloCabecalho}>
+    <div className="goleiros-tabela">
+      <div className="goleiros-cabecalho">
         <span>#</span>
-
-        <span style={{ textAlign: "left" }}>
-          GOLEIRO
-        </span>
-
-        <span>JOGOS</span>
-
-        <span>
-          GOLS
-          <br />
-          SOFRIDOS
-        </span>
-
+        <span>GOLEIRO</span>
+        <span>J</span>
+        <span>GS</span>
         <span>MÉDIA</span>
       </div>
 
       {goleiros.length === 0 ? (
-        <div
-          style={{
-            padding: "20px",
-            textAlign: "center",
-            color: "#aaa",
-          }}
-        >
+        <div className="goleiros-vazio">
           Nenhum goleiro listado.
         </div>
       ) : (
         goleiros.map((goleiro, indice) => (
-          <div key={goleiro.id} style={estiloLinha}>
+          <div
+            key={goleiro.id}
+            className={`goleiros-linha ${
+              indice === 0
+                ? "goleiros-top-1"
+                : indice === 1
+                ? "goleiros-top-2"
+                : indice === 2
+                ? "goleiros-top-3"
+                : ""
+            }`}
+          >
             <strong
-              style={{
-                color: "#4f46e5",
-                fontSize: "1rem",
-              }}
+              className={`goleiros-posicao ${
+                indice === 0
+                  ? "top-1"
+                  : indice === 1
+                  ? "top-2"
+                  : indice === 2
+                  ? "top-3"
+                  : ""
+              }`}
             >
               {indice + 1}
             </strong>
 
-            <div
-              style={{
-                minWidth: 0,
-                textAlign: "left",
-              }}
-            >
-              <strong
-                style={{
-                  display: "block",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  fontSize: "0.86rem",
-                }}
-                title={goleiro.nome}
-              >
-                {goleiro.nome}
-              </strong>
+            <div className="goleiros-jogador">
+              <img
+                className="goleiros-escudo"
+                src={escudoTime(goleiro.time)}
+                alt={`Escudo do ${goleiro.time}`}
+              />
 
-              <span
-                style={{
-                  display: "block",
-                  marginTop: "3px",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  color: "#aaa",
-                  fontSize: "0.68rem",
-                }}
-                title={goleiro.time}
-              >
-                {goleiro.time}
-              </span>
+              <div className="goleiros-info">
+                <strong title={goleiro.nome}>
+                  {goleiro.nome}
+                </strong>
+
+                <span title={goleiro.time}>
+                  {goleiro.time}
+                </span>
+              </div>
             </div>
 
             <span>{goleiro.jogosGoleiro}</span>
 
-            <span style={{ color: "#ef4444" }}>
-              {goleiro.golsSofridos}
+            <span className="goleiros-sofridos">
+              -{goleiro.golsSofridos}
             </span>
 
             <strong>{goleiro.media}</strong>
@@ -555,6 +418,5 @@ function TabelaGoleiros({ goleiros }) {
     </div>
   );
 }
-
 
 export default Estatisticas;

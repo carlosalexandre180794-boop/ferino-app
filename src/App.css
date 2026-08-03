@@ -1807,3 +1807,617 @@ main,
   }
 
 }
+/* ===== ESTATÍSTICAS — NOVO VISUAL ===== */
+
+.estatisticas-page {
+  width: min(920px, calc(100% - 24px));
+}
+
+.estatisticas-header {
+  margin-bottom: 14px;
+}
+
+.estatisticas-header h2 {
+  margin: 0;
+}
+
+.estatisticas-erro {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  background: #4a1f2a;
+  color: #ffffff;
+}
+
+.estatisticas-loading {
+  margin-top: 40px;
+  color: #ffffff;
+  text-align: center;
+}
+
+.estatisticas-destaques {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.estatistica-destaque-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #c58b2a;
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(197, 139, 42, 0.20),
+      rgba(31, 31, 33, 0.96) 52%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 12px 26px rgba(0, 0, 0, 0.22);
+}
+
+.estatistica-destaque-titulo {
+  display: block;
+  color: #f5b800;
+  font-size: 0.70rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.estatistica-destaque-conteudo {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.estatistica-destaque-conteudo > img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+
+.estatistica-destaque-pessoa {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.estatistica-destaque-pessoa > strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estatistica-destaque-pessoa > span {
+  overflow: hidden;
+  color: #b5b5b8;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estatistica-destaque-pessoa > small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #e3b24e;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estatistica-destaque-numero {
+  min-width: 54px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(245, 184, 0, 0.12);
+  text-align: center;
+}
+
+.estatistica-destaque-numero > strong {
+  display: block;
+  color: #ffffff;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.estatistica-destaque-numero > span {
+  display: block;
+  margin-top: 4px;
+  color: #c9c9cc;
+  font-size: 0.58rem;
+  line-height: 1.05;
+}
+
+.estatistica-destaque-vazio {
+  margin-top: 14px;
+  color: #a3a3a7;
+  font-size: 0.84rem;
+}
+
+.estatisticas-rankings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.estatisticas-coluna {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.estatisticas-ranking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.estatisticas-ranking-header h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.05rem;
+}
+
+.estatisticas-filtros {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 7px;
+  background: #1e1e24;
+}
+
+.estatisticas-filtro {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: transparent;
+  color: #c4c4c7;
+  cursor: pointer;
+  font-size: 0.74rem;
+}
+
+.estatisticas-filtro.ativo {
+  background: #39393e;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.estatisticas-periodo {
+  margin: 0 0 3px;
+  color: #8f8f95;
+  font-size: 0.73rem;
+}
+
+.artilharia-painel {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #303034;
+  border-radius: 12px;
+  background: #1b1b1e;
+}
+
+.artilharia-lista {
+  display: grid;
+  gap: 5px;
+}
+
+.artilharia-linha {
+  min-width: 0;
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 26px 34px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #27272b;
+}
+
+.artilharia-linha.artilharia-top-1 {
+  border-color: rgba(34, 197, 94, 0.62);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(34, 197, 94, 0.26),
+      rgba(39, 39, 43, 0.96) 64%
+    );
+}
+
+.artilharia-linha.artilharia-top-2 {
+  border-color: rgba(59, 130, 246, 0.62);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(59, 130, 246, 0.25),
+      rgba(39, 39, 43, 0.96) 64%
+    );
+}
+
+.artilharia-linha.artilharia-top-3 {
+  border-color: rgba(245, 184, 0, 0.68);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(245, 184, 0, 0.24),
+      rgba(39, 39, 43, 0.96) 64%
+    );
+}
+
+.artilharia-posicao {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #3a3a3e;
+  color: #ffffff;
+  font-size: 0.73rem;
+  font-weight: 900;
+}
+
+.artilharia-top-1 .artilharia-posicao {
+  background: #22c55e;
+  color: #07110a;
+}
+
+.artilharia-top-2 .artilharia-posicao {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.artilharia-top-3 .artilharia-posicao {
+  background: #f5b800;
+  color: #151004;
+}
+
+.artilharia-escudo {
+  width: 31px;
+  height: 31px;
+  object-fit: contain;
+}
+
+.artilharia-info {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.artilharia-info > strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 0.82rem;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artilharia-info > span {
+  overflow: hidden;
+  color: #9a9aa0;
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artilharia-gols {
+  text-align: right;
+}
+
+.artilharia-gols > strong {
+  display: block;
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.artilharia-gols > span {
+  color: #a8a8ad;
+  font-size: 0.58rem;
+}
+
+.artilharia-vazio,
+.goleiros-vazio {
+  margin: 0;
+  padding: 18px;
+  color: #a3a3a7;
+  text-align: center;
+}
+
+.goleiros-tabela {
+  overflow: hidden;
+  border: 1px solid #303034;
+  border-radius: 12px;
+  background: #1b1b1e;
+  color: #ffffff;
+}
+
+.goleiros-cabecalho,
+.goleiros-linha {
+  display: grid;
+  grid-template-columns:
+    26px minmax(92px, 1fr) 36px 38px 46px;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.goleiros-cabecalho {
+  min-height: 34px;
+  padding: 6px 7px;
+  border-bottom: 1px solid #343439;
+  color: #858590;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.goleiros-cabecalho span:nth-child(2) {
+  text-align: left;
+}
+
+.goleiros-linha {
+  min-height: 50px;
+  padding: 6px 7px;
+  border-bottom: 1px solid #2f2f34;
+  background: #232327;
+  font-size: 0.76rem;
+}
+
+.goleiros-linha:last-child {
+  border-bottom: 0;
+}
+
+.goleiros-posicao {
+  color: #7f8cff;
+  font-size: 0.86rem;
+}
+
+.goleiros-info {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.goleiros-info > strong,
+.goleiros-info > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goleiros-info > strong {
+  color: #ffffff;
+  font-size: 0.78rem;
+}
+
+.goleiros-info > span {
+  color: #99999e;
+  font-size: 0.62rem;
+}
+
+.goleiros-sofridos {
+  color: #ef6c6c;
+}
+
+@media (max-width: 700px) {
+  .estatisticas-destaques {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .estatistica-destaque-card {
+    padding: 11px;
+  }
+
+  .estatistica-destaque-titulo {
+    font-size: 0.58rem;
+  }
+
+  .estatistica-destaque-conteudo {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 9px;
+  }
+
+  .estatistica-destaque-conteudo > img {
+    width: 37px;
+    height: 37px;
+  }
+
+  .estatistica-destaque-pessoa > strong {
+    font-size: 0.84rem;
+  }
+
+  .estatistica-destaque-pessoa > span {
+    font-size: 0.66rem;
+  }
+
+  .estatistica-destaque-pessoa > small {
+    font-size: 0.57rem;
+  }
+
+  .estatistica-destaque-numero {
+    grid-column: 1 / -1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .estatistica-destaque-numero > strong {
+    font-size: 1.14rem;
+  }
+
+  .estatistica-destaque-numero > span {
+    margin: 0;
+    font-size: 0.56rem;
+  }
+
+  .estatisticas-rankings {
+    grid-template-columns: 1fr;
+  }
+
+  .artilharia-linha {
+    min-height: 47px;
+    grid-template-columns: 24px 31px minmax(0, 1fr) 40px;
+    gap: 7px;
+    padding: 5px 7px;
+  }
+
+  .artilharia-escudo {
+    width: 28px;
+    height: 28px;
+  }
+}
+/* =========================================================
+   ESTATÍSTICAS — CORES FINAIS E ESCUDOS DOS GOLEIROS
+   1º DOURADO | 2º VERDE | 3º AZUL
+   Cole este bloco NO FINAL do src/App.css
+   ========================================================= */
+
+/* ---------- ARTILHARIA: 1º DOURADO ---------- */
+
+.artilharia-linha.artilharia-top-1 {
+  border-color: rgba(245, 184, 0, 0.72);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(245, 184, 0, 0.26),
+      rgba(39, 39, 43, 0.97) 64%
+    );
+}
+
+.artilharia-top-1 .artilharia-posicao {
+  background: #f5b800;
+  color: #151004;
+}
+
+/* ---------- ARTILHARIA: 2º VERDE ---------- */
+
+.artilharia-linha.artilharia-top-2 {
+  border-color: rgba(34, 197, 94, 0.66);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(34, 197, 94, 0.25),
+      rgba(39, 39, 43, 0.97) 64%
+    );
+}
+
+.artilharia-top-2 .artilharia-posicao {
+  background: #22c55e;
+  color: #07110a;
+}
+
+/* ---------- ARTILHARIA: 3º AZUL ---------- */
+
+.artilharia-linha.artilharia-top-3 {
+  border-color: rgba(59, 130, 246, 0.66);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(59, 130, 246, 0.25),
+      rgba(39, 39, 43, 0.97) 64%
+    );
+}
+
+.artilharia-top-3 .artilharia-posicao {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* ---------- GOLEIROS: ESCUDO + NOME ---------- */
+
+.goleiros-jogador {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.goleiros-escudo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+/* ---------- GOLEIROS: 1º DOURADO ---------- */
+
+.goleiros-linha.goleiros-top-1 {
+  border-left: 4px solid #f5b800;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(245, 184, 0, 0.25),
+      rgba(35, 35, 39, 0.97) 62%
+    );
+}
+
+.goleiros-top-1 .goleiros-posicao {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f5b800;
+  color: #151004;
+}
+
+/* ---------- GOLEIROS: 2º VERDE ---------- */
+
+.goleiros-linha.goleiros-top-2 {
+  border-left: 4px solid #22c55e;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(34, 197, 94, 0.24),
+      rgba(35, 35, 39, 0.97) 62%
+    );
+}
+
+.goleiros-top-2 .goleiros-posicao {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #07110a;
+}
+
+/* ---------- GOLEIROS: 3º AZUL ---------- */
+
+.goleiros-linha.goleiros-top-3 {
+  border-left: 4px solid #3b82f6;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(59, 130, 246, 0.24),
+      rgba(35, 35, 39, 0.97) 62%
+    );
+}
+
+.goleiros-top-3 .goleiros-posicao {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #ffffff;
+}

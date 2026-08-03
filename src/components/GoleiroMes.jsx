@@ -1,25 +1,87 @@
-function GoleiroMes({ goleiro }) {
-  if (!goleiro) {
+import { escudoTime } from "../escudos";
+
+function GoleiroMes({
+  tipo = "goleiro",
+  goleiro,
+  artilheiro,
+}) {
+  const destaque =
+    tipo === "artilheiro" ? artilheiro : goleiro;
+
+  const titulo =
+    tipo === "artilheiro"
+      ? "⚽ ARTILHEIRO"
+      : "👑 DESTAQUE DA DEFESA";
+
+  if (!destaque) {
     return (
-      <article className="goalkeeper-card" style={{ background: "#1e1e24", padding: "20px", borderRadius: "8px" }}>
-        <span className="panel-label">GOLEIRO DO MÊS</span>
-        <h3 style={{ color: "#fff", marginTop: "5px" }}>Nenhum goleiro realizou jogos</h3>
+      <article className="estatistica-destaque-card">
+        <span className="estatistica-destaque-titulo">
+          {titulo}
+        </span>
+
+        <div className="estatistica-destaque-vazio">
+          Nenhum destaque disponível
+        </div>
       </article>
     );
   }
 
-  return (
-    <article className="goalkeeper-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1e1e24", padding: "20px", borderRadius: "8px", borderLeft: "4px solid #22c55e" }}>
-      <div>
-        <span className="panel-label" style={{ fontSize: "0.75rem", color: "#aaa", fontWeight: "bold" }}>👑 DESTAQUE DA DEFESA</span>
-        <h3 style={{ color: "#fff", fontSize: "1.4rem", margin: "4px 0" }}>{goleiro.nome}</h3>
-        <p style={{ color: "#aaa", margin: "2px 0" }}>{goleiro.time}</p>
-        <small style={{ color: "#4f46e5", fontWeight: "bold" }}>{goleiro.jogosGoleiro} jogo(s) realizado(s)</small>
-      </div>
+  const numero =
+    tipo === "artilheiro"
+      ? destaque.gols
+      : destaque.golsSofridos;
 
-      <div className="clean-sheet" style={{ textAlign: "center", background: "#2a2a32", padding: "10px 15px", borderRadius: "6px" }}>
-        <strong style={{ display: "block", fontSize: "1.8rem", color: "#ef4444" }}>{goleiro.golsSofridos}</strong>
-        <span style={{ fontSize: "0.75rem", color: "#aaa" }}>gols sofridos</span>
+  const rotuloNumero =
+    tipo === "artilheiro"
+      ? numero === 1
+        ? "gol"
+        : "gols"
+      : numero === 1
+      ? "gol sofrido"
+      : "gols sofridos";
+
+  const rodape =
+    tipo === "artilheiro"
+      ? `${destaque.gols} ${
+          destaque.gols === 1
+            ? "gol marcado"
+            : "gols marcados"
+        }`
+      : `${destaque.jogosGoleiro} ${
+          destaque.jogosGoleiro === 1
+            ? "jogo realizado"
+            : "jogos realizados"
+        }`;
+
+  return (
+    <article className="estatistica-destaque-card">
+      <span className="estatistica-destaque-titulo">
+        {titulo}
+      </span>
+
+      <div className="estatistica-destaque-conteudo">
+        <img
+          src={escudoTime(destaque.time)}
+          alt={`Escudo do ${destaque.time}`}
+        />
+
+        <div className="estatistica-destaque-pessoa">
+          <strong title={destaque.nome}>
+            {destaque.nome}
+          </strong>
+
+          <span title={destaque.time}>
+            {destaque.time}
+          </span>
+
+          <small>{rodape}</small>
+        </div>
+
+        <div className="estatistica-destaque-numero">
+          <strong>{numero}</strong>
+          <span>{rotuloNumero}</span>
+        </div>
       </div>
     </article>
   );

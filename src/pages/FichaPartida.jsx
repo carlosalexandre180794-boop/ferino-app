@@ -542,8 +542,12 @@ setJogadoresFora(
       return "Os times da partida ainda não foram carregados.";
     }
 
-    const placarCasa = Number(golsCasa || 0);
-    const placarFora = Number(golsFora || 0);
+    if (golsCasa === "" || golsFora === "") {
+      return "Informe o placar da partida.";
+    }
+
+    const placarCasa = Number(golsCasa);
+    const placarFora = Number(golsFora);
 
     if (
       !Number.isInteger(placarCasa) ||
@@ -554,20 +558,46 @@ setJogadoresFora(
       return "Digite um placar válido.";
     }
 
-    const autoresIncompletos =
-      autoresCasa.some((autor) => !autor.jogadorId) ||
-      autoresFora.some((autor) => !autor.jogadorId);
-
-    if (autoresIncompletos) {
-      return "Selecione o jogador de todos os gols.";
-    }
-
     if (!goleiroCasa || !goleiroFora) {
       return "Selecione os dois goleiros.";
     }
 
-    if (goleiroCasa === goleiroFora) {
+    if (String(goleiroCasa) === String(goleiroFora)) {
       return "Os dois times não podem usar o mesmo goleiro.";
+    }
+
+    if (autoresCasa.length !== placarCasa) {
+      return `Cadastre os ${placarCasa} gol(s) do ${jogo.casa}.`;
+    }
+
+    if (autoresFora.length !== placarFora) {
+      return `Cadastre os ${placarFora} gol(s) do ${jogo.fora}.`;
+    }
+
+    for (const gol of autoresCasa) {
+      if (!gol.jogadorId) {
+        return `Selecione o autor de todos os gols do ${jogo.casa}.`;
+      }
+
+      if (
+        gol.jogadorId === "gol-contra" &&
+        gol.contaArtilharia === true
+      ) {
+        return "Gol contra não pode contar para artilharia.";
+      }
+    }
+
+    for (const gol of autoresFora) {
+      if (!gol.jogadorId) {
+        return `Selecione o autor de todos os gols do ${jogo.fora}.`;
+      }
+
+      if (
+        gol.jogadorId === "gol-contra" &&
+        gol.contaArtilharia === true
+      ) {
+        return "Gol contra não pode contar para artilharia.";
+      }
     }
 
     return "";
