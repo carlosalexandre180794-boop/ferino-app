@@ -717,6 +717,88 @@ function Jogadores() {
           font-weight: 900;
         }
 
+
+        /* Aparência original: sem azul forte nem seleção de texto */
+        .jogadores-page .player-row,
+        .jogadores-page .player-number,
+        .jogadores-page .fixed-team,
+        .jogadores-page .fixed-team span,
+        .jogadores-page .player-picker,
+        .jogadores-page .player-picker-button,
+        .jogadores-page .player-picker-label,
+        .jogadores-page .player-picker-arrow,
+        .jogadores-page .player-picker-option,
+        .jogadores-page .player-picker-option span,
+        .jogadores-page .player-name-readonly {
+          -webkit-user-select: none !important;
+          user-select: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+
+        .jogadores-page .player-row ::selection,
+        .jogadores-page .player-picker-button::selection,
+        .jogadores-page .player-picker-label::selection,
+        .jogadores-page .fixed-team span::selection,
+        .jogadores-page .player-picker-option span::selection {
+          color: inherit;
+          background: transparent;
+        }
+
+        .jogadores-page .player-row {
+          background: rgba(24, 42, 70, 0.72);
+        }
+
+        .jogadores-page .player-number {
+          background: rgba(59, 130, 246, 0.14);
+          border-color: rgba(96, 165, 250, 0.52);
+        }
+
+        .jogadores-page .player-picker-button,
+        .jogadores-page .player-name-readonly {
+          color: #ffffff;
+          background: #101f37 !important;
+          border-color: rgba(96, 165, 250, 0.45) !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        .jogadores-page .player-picker-button:hover,
+        .jogadores-page .player-picker-button:focus,
+        .jogadores-page .player-picker-button:focus-visible,
+        .jogadores-page .player-picker-button:active,
+        .jogadores-page .player-picker-button[aria-expanded="true"] {
+          color: #ffffff;
+          background: #101f37 !important;
+          border-color: rgba(96, 165, 250, 0.58) !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        .jogadores-page .player-picker-label,
+        .jogadores-page .fixed-team span {
+          color: #ffffff !important;
+          background: transparent !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        .jogadores-page .player-picker-arrow {
+          color: #cbd5e1;
+          background: transparent !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        .jogadores-page .player-picker-option:hover,
+        .jogadores-page .player-picker-option:focus,
+        .jogadores-page .player-picker-option:active,
+        .jogadores-page .player-picker-option.ativo {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.06) !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
         @media (max-width: 1450px) {
           .jogadores-page .players-grid {
             grid-template-columns: 1fr;
