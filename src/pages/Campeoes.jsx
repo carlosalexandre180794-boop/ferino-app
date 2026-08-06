@@ -32,8 +32,10 @@ function Campeoes() {
           mes,
           ano,
           foto_campeao,
-          foto_vice,
-          foto_terceiro,
+foto_vice,
+foto_terceiro,
+foto_artilheiro,
+foto_goleiro,
           campeao:campeao_time_id ( id, nome ),
           vice:vice_time_id ( id, nome ),
           terceiro:terceiro_time_id ( id, nome ),
@@ -116,8 +118,10 @@ function Campeoes() {
         gols_sofridos_goleiro: golsSofridosGoleiro,
         jogos_goleiro: jogosGoleiro,
         foto_campeao_url: item.foto_campeao,
-        foto_vice_url: item.foto_vice,
-        foto_terceiro_url: item.foto_terceiro
+foto_vice_url: item.foto_vice,
+foto_terceiro_url: item.foto_terceiro,
+foto_artilheiro_url: item.foto_artilheiro,
+foto_goleiro_url: item.foto_goleiro,
       }];
 
       setHistorico(dadosFormatados);
@@ -265,8 +269,10 @@ function Campeoes() {
             gols_sofridos_goleiro: 0,
             jogos_goleiro: 0,
             foto_campeao_url: null,
-            foto_vice_url: null,
-            foto_terceiro_url: null,
+foto_vice_url: null,
+foto_terceiro_url: null,
+foto_artilheiro_url: null,
+foto_goleiro_url: null,
           },
         ];
 
