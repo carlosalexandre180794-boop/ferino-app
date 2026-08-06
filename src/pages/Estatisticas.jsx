@@ -24,7 +24,7 @@ function Estatisticas() {
   const [filtroArtilharia, setFiltroArtilharia] = useState("mes");
   const [filtroGoleiros, setFiltroGoleiros] = useState("mes");
 
-  const [anoAtivo] = useState(() =>
+  const [anoAtivo, setAnoAtivo] = useState(() =>
     Number(localStorage.getItem(CHAVE_ANO) || 2026)
   );
 
@@ -39,57 +39,93 @@ function Estatisticas() {
       setMensagem("");
 
       try {
+        const { data: temporada, error: erroTemporada } = await supabase
+          .from("temporadas")
+          .select("id")
+          .eq("ano", anoAtivo)
+          .eq("mes", mesAtivo)
+          .maybeSingle();
+
+        if (erroTemporada) throw erroTemporada;
+
+        const consultas = [
+          supabase.rpc("artilharia_anual", {
+            p_ano: anoAtivo,
+          }),
+          supabase.rpc("goleiros_anual", {
+            p_ano: anoAtivo,
+          }),
+        ];
+
+        if (temporada?.id) {
+          consultas.unshift(
+            supabase
+              .from("estatisticas_mensais")
+              .select(`
+                jogador_id,
+                jogador_nome_snapshot,
+                time_nome_snapshot,
+                jogos,
+                gols,
+                jogos_goleiro,
+                gols_sofridos,
+                pontos_time,
+                saldo_time,
+                gols_pro_time,
+                media_gols_sofridos
+              `)
+              .eq("temporada_id", temporada.id)
+          );
+        } else {
+          consultas.unshift(
+            Promise.resolve({
+              data: [],
+              error: null,
+            })
+          );
+        }
+
         const [
           respostaMensal,
           respostaArtilhariaAnual,
           respostaGoleirosAnual,
-        ] = await Promise.all([
-          supabase
-            .from("jogadores")
-            .select(`
-              id,
-              nome,
-              jogos,
-              gols,
-              goleiro,
-              jogos_goleiro,
-              gols_sofridos,
-              ativo,
-              times (
-                nome,
-                pontos,
-                saldo,
-                gols_pro
-              )
-            `)
-            .eq("ativo", true),
-
-          supabase.rpc("artilharia_anual", {
-            p_ano: anoAtivo,
-          }),
-
-          supabase.rpc("goleiros_anual", {
-            p_ano: anoAtivo,
-          }),
-        ]);
+        ] = await Promise.all(consultas);
 
         if (respostaMensal.error) throw respostaMensal.error;
-        if (respostaArtilhariaAnual.error) throw respostaArtilhariaAnual.error;
-        if (respostaGoleirosAnual.error) throw respostaGoleirosAnual.error;
+        if (respostaArtilhariaAnual.error) {
+          throw respostaArtilhariaAnual.error;
+        }
+        if (respostaGoleirosAnual.error) {
+          throw respostaGoleirosAnual.error;
+        }
 
         const listaMensal = (respostaMensal.data || []).map(
-          (jogador) => ({
-            id: jogador.id,
-            nome: jogador.nome,
-            goleiro: jogador.goleiro,
-            time: jogador.times?.nome || "Sem time",
-            gols: Number(jogador.gols || 0),
-            jogos: Number(jogador.jogos || 0),
-            jogosGoleiro: Number(jogador.jogos_goleiro || 0),
-            golsSofridos: Number(jogador.gols_sofridos || 0),
-            pontosTime: Number(jogador.times?.pontos || 0),
-            saldoTime: Number(jogador.times?.saldo || 0),
-            golsProTime: Number(jogador.times?.gols_pro || 0),
+          (registro) => ({
+            id: Number(registro.jogador_id),
+            nome:
+              registro.jogador_nome_snapshot ||
+              "Jogador não informado",
+            goleiro:
+              Number(registro.jogos_goleiro || 0) > 0,
+            time:
+              registro.time_nome_snapshot || "Sem time",
+            gols: Number(registro.gols || 0),
+            jogos: Number(registro.jogos || 0),
+            jogosGoleiro: Number(
+              registro.jogos_goleiro || 0
+            ),
+            golsSofridos: Number(
+              registro.gols_sofridos || 0
+            ),
+            pontosTime: Number(
+              registro.pontos_time || 0
+            ),
+            saldoTime: Number(
+              registro.saldo_time || 0
+            ),
+            golsProTime: Number(
+              registro.gols_pro_time || 0
+            ),
           })
         );
 
@@ -98,7 +134,7 @@ function Estatisticas() {
         ).map((jogador) => ({
           id: jogador.id,
           nome: jogador.nome,
-          goleiro: false,
+          goleiro: Boolean(jogador.goleiro),
           time: jogador.nome_time || "Sem time",
           gols: Number(jogador.gols || 0),
           jogos: Number(jogador.jogos || 0),
@@ -111,16 +147,48 @@ function Estatisticas() {
           nome: goleiro.nome,
           goleiro: true,
           time: goleiro.nome_time || "Sem time",
-          jogosGoleiro: Number(goleiro.jogos_goleiro || 0),
-          golsSofridos: Number(goleiro.gols_sofridos || 0),
-          media: Number(goleiro.media || 0).toFixed(2),
+          jogosGoleiro: Number(
+            goleiro.jogos_goleiro || 0
+          ),
+          golsSofridos: Number(
+            goleiro.gols_sofridos || 0
+          ),
+          pontosTime: Number(
+            goleiro.pontos_time || 0
+          ),
+          saldoTime: Number(
+            goleiro.saldo_time || 0
+          ),
+          golsProTime: Number(
+            goleiro.gols_pro_time || 0
+          ),
+          media: Number(
+            goleiro.media || 0
+          ).toFixed(2),
         }));
 
         setJogadoresMensais(listaMensal);
         setArtilheirosAnuais(listaArtilhariaAnual);
         setGoleirosAnuais(listaGoleirosAnual);
+
+        if (!temporada?.id) {
+          const nomeMes =
+            LISTA_MESES.find(
+              (item) => item.id === mesAtivo
+            )?.nome || "";
+
+          setMensagem(
+            `Nenhum registro mensal foi encontrado para ${nomeMes} de ${anoAtivo}.`
+          );
+        }
       } catch (erro) {
-        console.error("Erro ao carregar estatísticas:", erro);
+        console.error(
+          "Erro ao carregar estatísticas:",
+          erro
+        );
+        setJogadoresMensais([]);
+        setArtilheirosAnuais([]);
+        setGoleirosAnuais([]);
         setMensagem(
           `Erro ao carregar as estatísticas: ${erro.message}`
         );
@@ -130,7 +198,7 @@ function Estatisticas() {
     }
 
     carregarEstatisticas();
-  }, [anoAtivo]);
+  }, [anoAtivo, mesAtivo]);
 
   // CORREÇÃO: Removido o !jogador.goleiro para permitir goleiros marcarem gols na artilharia geral
   const artilheirosMensais = useMemo(
@@ -216,15 +284,26 @@ function Estatisticas() {
       : `Temporada ${anoAtivo}`;
 
   // DEFINIÇÃO DOS NOMES DINÂMICOS DOS CARDS
-  const tituloCardDefesa = filtroGoleiros === "mes" ? "Paredão do Mês" : "Paredão do Ano";
-  const tituloCardArtilheiro = filtroArtilharia === "mes" ? "Artilheiro do Mês" : "Artilheiro do Ano";
+  const tituloCardDefesa =
+    filtroGoleiros === "mes"
+      ? "Paredão do Mês"
+      : "Paredão do Ano";
+  const tituloCardArtilheiro =
+    filtroArtilharia === "mes"
+      ? "Artilheiro do Mês"
+      : "Artilheiro do Ano";
 
-  // Handler para quando o usuário mudar o seletor de meses na tela
-  const lidarComMudancaMes = (e) => {
-    const novoMes = Number(e.target.value);
+  function lidarComMudancaMes(evento) {
+    const novoMes = Number(evento.target.value);
     setMesAtivo(novoMes);
-    localStorage.setItem(CHAVE_MES, novoMes);
-  };
+    localStorage.setItem(CHAVE_MES, String(novoMes));
+  }
+
+  function lidarComMudancaAno(evento) {
+    const novoAno = Number(evento.target.value);
+    setAnoAtivo(novoAno);
+    localStorage.setItem(CHAVE_ANO, String(novoAno));
+  }
 
   return (
     <main className="page estatisticas-page">
@@ -232,13 +311,59 @@ function Estatisticas() {
         <h2>Estatísticas</h2>
       </section>
 
-      {/* SELETOR HISTÓRICO DE MESES (Exibido se qualquer uma das abas estiver no modo mensal) */}
-      {(filtroArtilharia === "mes" || filtroGoleiros === "mes") && (
-        <section className="estatisticas-seletor-mes" style={{ marginBottom: "20px" }}>
-          <label htmlFor="select-mes" style={{ marginRight: "10px", fontWeight: "bold" }}>Ver registros do mês:</label>
-          <select id="select-mes" value={mesAtivo} onChange={lidarComMudancaMes} style={{ padding: "6px 12px", borderRadius: "4px" }}>
-            {LISTA_MESES.map((m) => (
-              <option key={m.id} value={m.id}>{m.nome}</option>
+      {(filtroArtilharia === "mes" ||
+        filtroGoleiros === "mes") && (
+        <section
+          className="estatisticas-seletor-mes"
+          style={{
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+          <label
+            htmlFor="select-mes"
+            style={{ fontWeight: "bold" }}
+          >
+            Ver registros do período:
+          </label>
+
+          <select
+            id="select-mes"
+            value={mesAtivo}
+            onChange={lidarComMudancaMes}
+            style={{
+              minHeight: "42px",
+              padding: "8px 12px",
+              borderRadius: "6px",
+            }}
+          >
+            {LISTA_MESES.map((mes) => (
+              <option key={mes.id} value={mes.id}>
+                {mes.nome}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={anoAtivo}
+            onChange={lidarComMudancaAno}
+            aria-label="Selecionar ano das estatísticas"
+            style={{
+              minHeight: "42px",
+              padding: "8px 12px",
+              borderRadius: "6px",
+            }}
+          >
+            {Array.from(
+              { length: 8 },
+              (_, indice) => 2026 + indice
+            ).map((ano) => (
+              <option key={ano} value={ano}>
+                {ano}
+              </option>
             ))}
           </select>
         </section>
@@ -259,13 +384,13 @@ function Estatisticas() {
           <section className="estatisticas-destaques">
             <GoleiroMes
               tipo="goleiro"
-              tituloCustomizado={tituloCardDefesa} // Nova propriedade dinâmica
+              tituloCustomizado={tituloCardDefesa}
               goleiro={melhorGoleiro}
             />
 
             <GoleiroMes
               tipo="artilheiro"
-              tituloCustomizado={tituloCardArtilheiro} // Nova propriedade dinâmica
+              tituloCustomizado={tituloCardArtilheiro}
               artilheiro={artilheiroDestaque}
             />
           </section>
