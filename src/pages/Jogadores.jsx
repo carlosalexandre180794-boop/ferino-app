@@ -695,12 +695,14 @@ function Jogadores() {
         }
 
         .jogadores-page .substitution-box {
+          width: 100%;
           min-width: 0;
           min-height: 44px;
           display: flex;
           align-items: center;
+          justify-content: flex-start;
           flex-wrap: wrap;
-          gap: 6px 12px;
+          gap: 6px 14px;
           padding: 8px 13px;
           border-radius: 10px;
           color: #ffffff;
@@ -712,44 +714,66 @@ function Jogadores() {
           -webkit-tap-highlight-color: transparent;
         }
 
+        .jogadores-page .substitution-box > span,
+        .jogadores-page .substitution-box span {
+          background: transparent !important;
+          box-shadow: none !important;
+          outline: none !important;
+          border: 0 !important;
+        }
+
         .jogadores-page .substitution-item {
-          min-width: 0;
-          display: inline-flex;
+          display: inline-flex !important;
           align-items: center;
+          flex: 0 1 auto;
+          min-width: max-content;
           gap: 5px;
-          color: #ffffff;
+          color: #ffffff !important;
           font-size: 0.82rem;
           font-weight: 900;
           white-space: nowrap;
+          overflow: visible;
+        }
+
+        .jogadores-page .substitution-arrow-in,
+        .jogadores-page .substitution-arrow-out {
+          display: inline !important;
+          flex: 0 0 auto;
+          width: auto !important;
+          height: auto !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          font-size: 0.9rem;
+          line-height: 1;
         }
 
         .jogadores-page .substitution-arrow-in {
-          flex: 0 0 auto;
-          color: #4ade80;
-          font-size: 0.9rem;
-          line-height: 1;
+          color: #4ade80 !important;
         }
 
         .jogadores-page .substitution-arrow-out {
-          flex: 0 0 auto;
-          color: #f87171;
-          font-size: 0.9rem;
-          line-height: 1;
+          color: #f87171 !important;
         }
 
         .jogadores-page .substitution-name {
-          min-width: 0;
+          display: inline !important;
+          flex: 0 1 auto;
+          width: auto !important;
+          min-width: max-content;
+          padding: 0 !important;
+          margin: 0 !important;
           color: #ffffff !important;
           background: transparent !important;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          white-space: nowrap;
+          overflow: visible;
+          text-overflow: clip;
         }
 
         .jogadores-page .substitution-box ::selection {
           color: inherit;
           background: transparent;
         }
-
 
         /* Aparência original: sem azul forte nem seleção de texto */
         .jogadores-page .player-row,
