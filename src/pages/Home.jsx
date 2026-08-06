@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { escudoTime } from "../escudos";
 function capitalizarNome(nome = "") {
-  return String(nome)
-    .toLowerCase()
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+  return String(nome ?? "")
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, separador, letra) =>
+        separador + letra.toLocaleUpperCase("pt-BR")
+    );
 }
 function Home() {
   const [dados, setDados] = useState({
