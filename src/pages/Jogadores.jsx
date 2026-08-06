@@ -696,25 +696,58 @@ function Jogadores() {
 
         .jogadores-page .substitution-box {
           min-width: 0;
-          display: grid;
-          gap: 3px;
-          padding: 7px 10px;
+          min-height: 44px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 6px 12px;
+          padding: 8px 13px;
           border-radius: 10px;
+          color: #ffffff;
           background: #101f37;
           border: 1px solid rgba(96, 165, 250, 0.45);
-          line-height: 1.1;
+          line-height: 1.2;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
 
-        .jogadores-page .substitution-in {
+        .jogadores-page .substitution-item {
+          min-width: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: #ffffff;
+          font-size: 0.82rem;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .jogadores-page .substitution-arrow-in {
+          flex: 0 0 auto;
           color: #4ade80;
-          font-size: 0.82rem;
-          font-weight: 900;
+          font-size: 0.9rem;
+          line-height: 1;
         }
 
-        .jogadores-page .substitution-out {
+        .jogadores-page .substitution-arrow-out {
+          flex: 0 0 auto;
           color: #f87171;
-          font-size: 0.82rem;
-          font-weight: 900;
+          font-size: 0.9rem;
+          line-height: 1;
+        }
+
+        .jogadores-page .substitution-name {
+          min-width: 0;
+          color: #ffffff !important;
+          background: transparent !important;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .jogadores-page .substitution-box ::selection {
+          color: inherit;
+          background: transparent;
         }
 
 
@@ -1059,11 +1092,28 @@ function Jogadores() {
 
                       {substituicao ? (
                         <div className="substitution-box">
-                          <span className="substitution-in">
-                            ▲ {substituicao.jogador_entrada_nome_snapshot}
+                          <span className="substitution-item">
+                            <span
+                              className="substitution-arrow-in"
+                              aria-hidden="true"
+                            >
+                              ▲
+                            </span>
+                            <span className="substitution-name">
+                              {substituicao.jogador_entrada_nome_snapshot}
+                            </span>
                           </span>
-                          <span className="substitution-out">
-                            ▼ {substituicao.jogador_saida_nome_snapshot}
+
+                          <span className="substitution-item">
+                            <span
+                              className="substitution-arrow-out"
+                              aria-hidden="true"
+                            >
+                              ▼
+                            </span>
+                            <span className="substitution-name">
+                              {substituicao.jogador_saida_nome_snapshot}
+                            </span>
                           </span>
                         </div>
                       ) : adminLiberado ? (
