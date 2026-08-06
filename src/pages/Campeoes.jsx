@@ -62,8 +62,8 @@ function Campeoes() {
           { data: golsDoJogador, error: erroGols },
         ] = await Promise.all([
           supabase
-            .from("jogadores")
-            .select("nome")
+           .from("jogadores")
+.select("nome, gols")
             .eq("id", item.artilheiro_id)
             .single(),
 
@@ -82,26 +82,7 @@ function Campeoes() {
         if (erroGols) throw erroGols;
 
         nomeArtilheiro = jogador?.nome || "Não informado";
-
-        golsArtilheiro = (golsDoJogador || []).reduce((total, registro) => {
-          const dataJogo = registro.partida?.data_jogo;
-
-          if (!dataJogo) return total;
-
-          const [anoJogo, mesJogo] = dataJogo
-            .slice(0, 10)
-            .split("-")
-            .map(Number);
-
-          if (
-            anoJogo === Number(item.ano) &&
-            mesJogo === Number(item.mes)
-          ) {
-            return total + Number(registro.quantidade || 0);
-          }
-
-          return total;
-        }, 0);
+        golsArtilheiro = Number(jogador?.gols || 0);
       }
 
       let golsSofridosGoleiro = 0;
