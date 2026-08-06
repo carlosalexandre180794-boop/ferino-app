@@ -629,9 +629,11 @@ function capitalizarNome(nome = "") {
           position: absolute;
           top: calc(100% + 4px);
           left: 0;
-          right: 0;
+          right: auto;
           z-index: 100;
-          width: 100%;
+          width: max-content;
+          min-width: 100%;
+          max-width: min(360px, calc(100vw - 28px));
           max-height: 320px;
           overflow-x: hidden;
           overflow-y: auto;
@@ -647,9 +649,10 @@ function capitalizarNome(nome = "") {
 
         .jogadores-page .player-picker-option {
           width: 100%;
+          min-width: 240px;
           min-height: 42px;
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr);
+          grid-template-columns: 28px minmax(180px, 1fr);
           align-items: center;
           gap: 9px;
           padding: 7px 9px;
@@ -681,15 +684,17 @@ function capitalizarNome(nome = "") {
         }
 
         .jogadores-page .player-picker-option span {
-          min-width: 0;
+          display: block;
+          min-width: 180px;
           color: #ffffff !important;
           background: transparent !important;
           font-size: 0.87rem;
           font-weight: 700;
           line-height: 1.25;
-          white-space: normal;
+          white-space: nowrap;
           overflow: visible;
-          overflow-wrap: anywhere;
+          overflow-wrap: normal;
+          word-break: normal;
           text-overflow: clip;
           user-select: none;
           -webkit-user-select: none;
