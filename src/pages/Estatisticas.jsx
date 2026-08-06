@@ -10,8 +10,12 @@ const CHAVE_MES = "ferino_mes_ativo";
 function capitalizarNome(nome = "") {
   return String(nome ?? "")
     .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+    .toLocaleLowerCase("pt-BR")
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, separador, letra) =>
+        separador + letra.toLocaleUpperCase("pt-BR")
+    );
 }
 
 const LISTA_MESES = [

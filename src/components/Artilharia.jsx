@@ -1,8 +1,13 @@
 import { escudoTime } from "../escudos";
 function capitalizarNome(nome = "") {
-  return nome
-    .toLowerCase()
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+  return String(nome ?? "")
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, separador, letra) =>
+        separador + letra.toLocaleUpperCase("pt-BR")
+    );
 }
 function Artilharia({ artilheiros }) {
   return (

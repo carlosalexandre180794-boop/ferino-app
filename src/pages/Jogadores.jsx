@@ -310,12 +310,7 @@ function Jogadores() {
     setSeletorAberto(null);
     setMensagem("Modo administrador encerrado.");
   }
-function capitalizarNome(nome = "") {
-  return String(nome ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
-}
+
   const nomeMesSelecionado =
     MESES.find((mes) => mes.valor === Number(mesSelecionado))?.nome ||
     "Mês";
@@ -1191,8 +1186,8 @@ function capitalizarNome(nome = "") {
                             aria-label={`Selecionar jogador para a posição ${jogador.posicao} do ${time.nome}`}
                           >
                             <span className="player-picker-label">
-                              {jogador.nome}
-                              {jogador.capitao ? " (C)" : ""}
+                             {capitalizarNome(jogador.nome)}
+{jogador.capitao ? " (C)" : ""}
                             </span>
 
                             <span className="player-picker-arrow">▾</span>
@@ -1252,8 +1247,8 @@ function capitalizarNome(nome = "") {
                           className="player-name-readonly"
                           title={jogador.nome}
                         >
-                          {jogador.nome}
-                          {jogador.capitao ? " (C)" : ""}
+                         {capitalizarNome(jogador.nome)}
+{jogador.capitao ? " (C)" : ""}
                         </div>
                       )}
                     </div>
