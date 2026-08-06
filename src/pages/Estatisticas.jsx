@@ -7,6 +7,13 @@ import { escudoTime } from "../escudos";
 const CHAVE_ANO = "ferino_ano_ativo";
 const CHAVE_MES = "ferino_mes_ativo";
 
+function capitalizarNome(nome = "") {
+  return String(nome ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
+
 const LISTA_MESES = [
   { id: 1, nome: "Janeiro" }, { id: 2, nome: "Fevereiro" }, { id: 3, nome: "Março" },
   { id: 4, nome: "Abril" }, { id: 5, nome: "Maio" }, { id: 6, nome: "Junho" },
@@ -368,6 +375,20 @@ function Estatisticas() {
       ? artilheirosExibidos[0]
       : null;
 
+  const artilheiroDestaqueFormatado = artilheiroDestaque
+    ? {
+        ...artilheiroDestaque,
+        nome: capitalizarNome(artilheiroDestaque.nome),
+      }
+    : null;
+
+  const melhorGoleiroFormatado = melhorGoleiro
+    ? {
+        ...melhorGoleiro,
+        nome: capitalizarNome(melhorGoleiro.nome),
+      }
+    : null;
+
   const nomeMesAtivo = new Intl.DateTimeFormat(
     "pt-BR",
     { month: "long" }
@@ -487,13 +508,13 @@ function Estatisticas() {
             <GoleiroMes
               tipo="goleiro"
               tituloCustomizado={tituloCardDefesa}
-              goleiro={melhorGoleiro}
+              goleiro={melhorGoleiroFormatado}
             />
 
             <GoleiroMes
               tipo="artilheiro"
               tituloCustomizado={tituloCardArtilheiro}
-              artilheiro={artilheiroDestaque}
+              artilheiro={artilheiroDestaqueFormatado}
             />
           </section>
 
@@ -637,8 +658,8 @@ function TabelaGoleiros({ goleiros }) {
               />
 
               <div className="goleiros-info">
-                <strong title={goleiro.nome}>
-                  {goleiro.nome}
+                <strong title={capitalizarNome(goleiro.nome)}>
+                  {capitalizarNome(goleiro.nome)}
                 </strong>
 
                 <span title={goleiro.time}>
