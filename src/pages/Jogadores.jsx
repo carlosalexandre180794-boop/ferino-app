@@ -310,11 +310,7 @@ function Jogadores() {
     setSeletorAberto(null);
     setMensagem("Modo administrador encerrado.");
   }
-function capitalizarNome(nome = "") {
-  return nome
-    .toLowerCase()
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
-}
+
   const nomeMesSelecionado =
     MESES.find((mes) => mes.valor === Number(mesSelecionado))?.nome ||
     "Mês";
@@ -628,9 +624,11 @@ function capitalizarNome(nome = "") {
           position: absolute;
           top: calc(100% + 4px);
           left: 0;
-          right: 0;
+          right: auto;
           z-index: 100;
-          width: 100%;
+          width: max-content;
+          min-width: 100%;
+          max-width: min(420px, calc(100vw - 32px));
           max-height: 320px;
           overflow-x: hidden;
           overflow-y: auto;
@@ -639,13 +637,17 @@ function capitalizarNome(nome = "") {
           border: 1px solid rgba(96, 165, 250, 0.75);
           background: #101f37;
           box-shadow: 0 20px 44px rgba(0, 0, 0, 0.58);
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .jogadores-page .player-picker-option {
           width: 100%;
+          min-width: 250px;
           min-height: 40px;
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr);
+          grid-template-columns: 28px minmax(190px, 1fr);
           align-items: center;
           gap: 9px;
           padding: 6px 9px;
@@ -655,6 +657,9 @@ function capitalizarNome(nome = "") {
           background: transparent;
           text-align: left;
           cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .jogadores-page .player-picker-option:hover,
@@ -669,14 +674,27 @@ function capitalizarNome(nome = "") {
         }
 
         .jogadores-page .player-picker-option span {
-          min-width: 0;
-          color: #ffffff;
+          display: block;
+          width: 100%;
+          min-width: 190px;
+          color: #ffffff !important;
+          background: transparent !important;
           font-size: 0.87rem;
           font-weight: 700;
           line-height: 1.2;
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          overflow: visible;
+          text-overflow: clip;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .jogadores-page .player-picker-menu ::selection,
+        .jogadores-page .player-picker-option::selection,
+        .jogadores-page .player-picker-option span::selection {
+          color: inherit;
+          background: transparent;
         }
 
         .jogadores-page .player-name-readonly {
@@ -1128,7 +1146,7 @@ function capitalizarNome(nome = "") {
                               ▲
                             </span>
                             <span className="substitution-name">
-                             {capitalizarNome(substituicao.jogador_entrada_nome_snapshot)}
+                              {substituicao.jogador_entrada_nome_snapshot}
                             </span>
                           </span>
 
@@ -1140,7 +1158,7 @@ function capitalizarNome(nome = "") {
                               ▼
                             </span>
                             <span className="substitution-name">
-                              {capitalizarNome(substituicao.jogador_saida_nome_snapshot)}
+                              {substituicao.jogador_saida_nome_snapshot}
                             </span>
                           </span>
                         </div>
@@ -1210,7 +1228,7 @@ function capitalizarNome(nome = "") {
                                       />
 
                                       <span>
-                                        {opcao.nome}
+                                        {capitalizarNome(opcao.nome)}
                                         {opcao.capitao ? " (C)" : ""}
                                       </span>
                                     </button>
