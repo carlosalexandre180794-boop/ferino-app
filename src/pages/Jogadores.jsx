@@ -310,7 +310,11 @@ function Jogadores() {
     setSeletorAberto(null);
     setMensagem("Modo administrador encerrado.");
   }
-
+function capitalizarNome(nome = "") {
+  return nome
+    .toLowerCase()
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
   const nomeMesSelecionado =
     MESES.find((mes) => mes.valor === Number(mesSelecionado))?.nome ||
     "Mês";
@@ -1124,7 +1128,7 @@ function Jogadores() {
                               ▲
                             </span>
                             <span className="substitution-name">
-                              {substituicao.jogador_entrada_nome_snapshot}
+                             {capitalizarNome(substituicao.jogador_entrada_nome_snapshot)}
                             </span>
                           </span>
 
@@ -1136,7 +1140,7 @@ function Jogadores() {
                               ▼
                             </span>
                             <span className="substitution-name">
-                              {substituicao.jogador_saida_nome_snapshot}
+                              {capitalizarNome(substituicao.jogador_saida_nome_snapshot)}
                             </span>
                           </span>
                         </div>
