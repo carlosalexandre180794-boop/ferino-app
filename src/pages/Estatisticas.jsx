@@ -55,6 +55,22 @@ function Estatisticas() {
           supabase.rpc("goleiros_anual", {
             p_ano: anoAtivo,
           }),
+          supabase
+            .from("jogadores")
+            .select(`
+              id,
+              nome,
+              goleiro,
+              gols,
+              jogos,
+              jogos_goleiro,
+              gols_sofridos,
+              time_id,
+              times (
+                nome
+              )
+            `)
+            .eq("ativo", true),
         ];
 
         if (temporada?.id) {
@@ -89,6 +105,7 @@ function Estatisticas() {
           respostaMensal,
           respostaArtilhariaAnual,
           respostaGoleirosAnual,
+          respostaJogadoresAtuais,
         ] = await Promise.all(consultas);
 
         if (respostaMensal.error) throw respostaMensal.error;
@@ -98,8 +115,21 @@ function Estatisticas() {
         if (respostaGoleirosAnual.error) {
           throw respostaGoleirosAnual.error;
         }
+        if (respostaJogadoresAtuais.error) {
+          throw respostaJogadoresAtuais.error;
+        }
 
-        const listaMensal = (respostaMensal.data || []).map(
+        const dataAtual = new Date();
+        const anoAtual = dataAtual.getFullYear();
+        const mesAtual = dataAtual.getMonth() + 1;
+
+        const selecionouPeriodoAtual =
+          Number(anoAtivo) === Number(anoAtual) &&
+          Number(mesAtivo) === Number(mesAtual);
+
+        const snapshotMensal = respostaMensal.data || [];
+
+        const listaMensalDoHistorico = snapshotMensal.map(
           (registro) => ({
             id: Number(registro.jogador_id),
             nome:
@@ -128,6 +158,33 @@ function Estatisticas() {
             ),
           })
         );
+
+        const listaMensalAtual = (
+          respostaJogadoresAtuais.data || []
+        ).map((jogador) => ({
+          id: Number(jogador.id),
+          nome: jogador.nome || "Jogador não informado",
+          goleiro: Boolean(jogador.goleiro),
+          time: jogador.times?.nome || "Sem time",
+          gols: Number(jogador.gols || 0),
+          jogos: Number(jogador.jogos || 0),
+          jogosGoleiro: Number(
+            jogador.jogos_goleiro || 0
+          ),
+          golsSofridos: Number(
+            jogador.gols_sofridos || 0
+          ),
+          pontosTime: 0,
+          saldoTime: 0,
+          golsProTime: 0,
+        }));
+
+        const listaMensal =
+          listaMensalDoHistorico.length > 0
+            ? listaMensalDoHistorico
+            : selecionouPeriodoAtual
+              ? listaMensalAtual
+              : [];
 
         const listaArtilhariaAnual = (
           respostaArtilhariaAnual.data || []
@@ -175,7 +232,10 @@ function Estatisticas() {
         setArtilheirosAnuais(listaArtilhariaAnual);
         setGoleirosAnuais(listaGoleirosAnual);
 
-        if (!temporada?.id) {
+        if (
+          listaMensal.length === 0 &&
+          !selecionouPeriodoAtual
+        ) {
           const nomeMes =
             LISTA_MESES.find(
               (item) => item.id === mesAtivo
