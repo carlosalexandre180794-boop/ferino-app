@@ -310,7 +310,12 @@ function Jogadores() {
     setSeletorAberto(null);
     setMensagem("Modo administrador encerrado.");
   }
-
+function capitalizarNome(nome = "") {
+  return String(nome ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
   const nomeMesSelecionado =
     MESES.find((mes) => mes.valor === Number(mesSelecionado))?.nome ||
     "Mês";
@@ -624,17 +629,15 @@ function Jogadores() {
           position: absolute;
           top: calc(100% + 4px);
           left: 0;
-          right: auto;
+          right: 0;
           z-index: 100;
-          width: max-content;
-          min-width: 100%;
-          max-width: min(420px, calc(100vw - 32px));
+          width: 100%;
           max-height: 320px;
           overflow-x: hidden;
           overflow-y: auto;
           padding: 6px;
           border-radius: 10px;
-          border: 1px solid rgba(96, 165, 250, 0.75);
+          border: 1px solid rgba(96, 165, 250, 0.58);
           background: #101f37;
           box-shadow: 0 20px 44px rgba(0, 0, 0, 0.58);
           user-select: none;
@@ -644,13 +647,12 @@ function Jogadores() {
 
         .jogadores-page .player-picker-option {
           width: 100%;
-          min-width: 250px;
-          min-height: 40px;
+          min-height: 42px;
           display: grid;
-          grid-template-columns: 28px minmax(190px, 1fr);
+          grid-template-columns: 28px minmax(0, 1fr);
           align-items: center;
           gap: 9px;
-          padding: 6px 9px;
+          padding: 7px 9px;
           border: 0;
           border-radius: 8px;
           color: #ffffff;
@@ -663,8 +665,13 @@ function Jogadores() {
         }
 
         .jogadores-page .player-picker-option:hover,
+        .jogadores-page .player-picker-option:focus,
+        .jogadores-page .player-picker-option:active,
         .jogadores-page .player-picker-option.ativo {
-          background: rgba(59, 130, 246, 0.20);
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.06) !important;
+          outline: none;
+          box-shadow: none;
         }
 
         .jogadores-page .player-picker-option img {
@@ -674,20 +681,18 @@ function Jogadores() {
         }
 
         .jogadores-page .player-picker-option span {
-          display: block;
-          width: 100%;
-          min-width: 190px;
+          min-width: 0;
           color: #ffffff !important;
           background: transparent !important;
           font-size: 0.87rem;
           font-weight: 700;
-          line-height: 1.2;
-          white-space: nowrap;
+          line-height: 1.25;
+          white-space: normal;
           overflow: visible;
+          overflow-wrap: anywhere;
           text-overflow: clip;
           user-select: none;
           -webkit-user-select: none;
-          -webkit-tap-highlight-color: transparent;
         }
 
         .jogadores-page .player-picker-menu ::selection,
@@ -1146,7 +1151,7 @@ function Jogadores() {
                               ▲
                             </span>
                             <span className="substitution-name">
-                              {substituicao.jogador_entrada_nome_snapshot}
+                             {capitalizarNome(substituicao.jogador_entrada_nome_snapshot)}
                             </span>
                           </span>
 
@@ -1158,7 +1163,7 @@ function Jogadores() {
                               ▼
                             </span>
                             <span className="substitution-name">
-                              {substituicao.jogador_saida_nome_snapshot}
+                              {capitalizarNome(substituicao.jogador_saida_nome_snapshot)}
                             </span>
                           </span>
                         </div>
