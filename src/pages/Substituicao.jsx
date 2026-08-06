@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
 
+const SUBSTITUICAO_MENSAL_V2 = "2026-08-05-v2";
+
 const MESES = [
   { valor: 1, nome: "Janeiro" },
   { valor: 2, nome: "Fevereiro" },
@@ -54,6 +56,7 @@ function Substituicao() {
   const [mensagem, setMensagem] = useState("");
 
   useEffect(() => {
+    console.info("SUBSTITUICAO_MENSAL_V2", SUBSTITUICAO_MENSAL_V2);
     carregarTimes();
   }, []);
 
@@ -96,7 +99,6 @@ function Substituicao() {
           p_mes: Number(mesSelecionado),
         }
       );
-console.log("RETORNO INSERT:", { data, error });
       if (erroCriar) {
         throw new Error(erroCriar.message);
       }
@@ -206,7 +208,6 @@ console.log("RETORNO INSERT:", { data, error });
   async function realizarSubstituicao(evento) {
     evento.preventDefault();
     setMensagem("");
-console.log("ENTROU NA FUNÇÃO");
     if (
       !temporadaId ||
       !timeSelecionado ||
@@ -257,6 +258,8 @@ console.log("ENTROU NA FUNÇÃO");
         .select()
         .single();
 
+      console.info("SUBSTITUICAO_INSERT_RETORNO", { data, error });
+
       if (error) {
         throw error;
       }
@@ -271,7 +274,7 @@ console.log("ENTROU NA FUNÇÃO");
       setJogadorEntrando("");
       setRodada("");
     } catch (error) {
-     console.error("ERRO COMPLETO:", error);
+     console.error("SUBSTITUICAO_INSERT_ERRO", error);
       setMensagem(`Erro ao salvar a substituição: ${error.message}`);
     } finally {
       setSalvando(false);
@@ -449,7 +452,7 @@ console.log("ENTROU NA FUNÇÃO");
             Substituição
           </h2>
           <p style={{ color: "#aaa", margin: "6px 0 0" }}>
-            Troca temporária sem apagar o jogador oficial.
+            Troca temporária sem apagar o jogador oficial. • Sistema mensal ativo
           </p>
         </div>
 
