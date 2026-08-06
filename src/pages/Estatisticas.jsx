@@ -7,6 +7,13 @@ import { escudoTime } from "../escudos";
 const CHAVE_ANO = "ferino_ano_ativo";
 const CHAVE_MES = "ferino_mes_ativo";
 
+const LISTA_MESES = [
+  { id: 1, nome: "Janeiro" }, { id: 2, nome: "Fevereiro" }, { id: 3, nome: "Março" },
+  { id: 4, nome: "Abril" }, { id: 5, nome: "Maio" }, { id: 6, nome: "Junho" },
+  { id: 7, nome: "Julho" }, { id: 8, nome: "Agosto" }, { id: 9, nome: "Setembro" },
+  { id: 10, nome: "Outubro" }, { id: 11, nome: "Novembro" }, { id: 12, nome: "Dezembro" }
+];
+
 function Estatisticas() {
   const [jogadoresMensais, setJogadoresMensais] = useState([]);
   const [artilheirosAnuais, setArtilheirosAnuais] = useState([]);
@@ -21,7 +28,8 @@ function Estatisticas() {
     Number(localStorage.getItem(CHAVE_ANO) || 2026)
   );
 
-  const [mesAtivo] = useState(() =>
+  // Alterado para useState comum para permitir a troca dinâmica de meses na tela
+  const [mesAtivo, setMesAtivo] = useState(() =>
     Number(localStorage.getItem(CHAVE_MES) || 8)
   );
 
@@ -66,12 +74,8 @@ function Estatisticas() {
         ]);
 
         if (respostaMensal.error) throw respostaMensal.error;
-        if (respostaArtilhariaAnual.error) {
-          throw respostaArtilhariaAnual.error;
-        }
-        if (respostaGoleirosAnual.error) {
-          throw respostaGoleirosAnual.error;
-        }
+        if (respostaArtilhariaAnual.error) throw respostaArtilhariaAnual.error;
+        if (respostaGoleirosAnual.error) throw respostaGoleirosAnual.error;
 
         const listaMensal = (respostaMensal.data || []).map(
           (jogador) => ({
@@ -128,13 +132,11 @@ function Estatisticas() {
     carregarEstatisticas();
   }, [anoAtivo]);
 
+  // CORREÇÃO: Removido o !jogador.goleiro para permitir goleiros marcarem gols na artilharia geral
   const artilheirosMensais = useMemo(
     () =>
       jogadoresMensais
-        .filter(
-          (jogador) =>
-            !jogador.goleiro && jogador.gols > 0
-        )
+        .filter((jogador) => jogador.gols > 0)
         .sort(
           (a, b) =>
             b.gols - a.gols ||
@@ -156,26 +158,16 @@ function Estatisticas() {
           ...goleiro,
           media:
             goleiro.jogosGoleiro > 0
-              ? (
-                  goleiro.golsSofridos /
-                  goleiro.jogosGoleiro
-                ).toFixed(2)
+              ? (goleiro.golsSofridos / goleiro.jogosGoleiro).toFixed(2)
               : "0.00",
         }))
         .sort((a, b) => {
-          if (a.jogosGoleiro > 0 && b.jogosGoleiro === 0) {
-            return -1;
-          }
-
-          if (a.jogosGoleiro === 0 && b.jogosGoleiro > 0) {
-            return 1;
-          }
+          if (a.jogosGoleiro > 0 && b.jogosGoleiro === 0) return -1;
+          if (a.jogosGoleiro === 0 && b.jogosGoleiro > 0) return 1;
 
           if (a.jogosGoleiro > 0 && b.jogosGoleiro > 0) {
-            const mediaA =
-              a.golsSofridos / a.jogosGoleiro;
-            const mediaB =
-              b.golsSofridos / b.jogosGoleiro;
+            const mediaA = a.golsSofridos / a.jogosGoleiro;
+            const mediaB = b.golsSofridos / b.jogosGoleiro;
 
             return (
               mediaA - mediaB ||
@@ -215,23 +207,42 @@ function Estatisticas() {
 
   const periodoArtilharia =
     filtroArtilharia === "mes"
-      ? `${nomeMesAtivo.charAt(0).toUpperCase()}${nomeMesAtivo.slice(
-          1
-        )} de ${anoAtivo}`
+      ? `${nomeMesAtivo.charAt(0).toUpperCase()}${nomeMesAtivo.slice(1)} de ${anoAtivo}`
       : `Temporada ${anoAtivo}`;
 
   const periodoGoleiros =
     filtroGoleiros === "mes"
-      ? `${nomeMesAtivo.charAt(0).toUpperCase()}${nomeMesAtivo.slice(
-          1
-        )} de ${anoAtivo}`
+      ? `${nomeMesAtivo.charAt(0).toUpperCase()}${nomeMesAtivo.slice(1)} de ${anoAtivo}`
       : `Temporada ${anoAtivo}`;
+
+  // DEFINIÇÃO DOS NOMES DINÂMICOS DOS CARDS
+  const tituloCardDefesa = filtroGoleiros === "mes" ? "Paredão do Mês" : "Paredão do Ano";
+  const tituloCardArtilheiro = filtroArtilharia === "mes" ? "Artilheiro do Mês" : "Artilheiro do Ano";
+
+  // Handler para quando o usuário mudar o seletor de meses na tela
+  const lidarComMudancaMes = (e) => {
+    const novoMes = Number(e.target.value);
+    setMesAtivo(novoMes);
+    localStorage.setItem(CHAVE_MES, novoMes);
+  };
 
   return (
     <main className="page estatisticas-page">
       <section className="page-header estatisticas-header">
         <h2>Estatísticas</h2>
       </section>
+
+      {/* SELETOR HISTÓRICO DE MESES (Exibido se qualquer uma das abas estiver no modo mensal) */}
+      {(filtroArtilharia === "mes" || filtroGoleiros === "mes") && (
+        <section className="estatisticas-seletor-mes" style={{ marginBottom: "20px" }}>
+          <label htmlFor="select-mes" style={{ marginRight: "10px", fontWeight: "bold" }}>Ver registros do mês:</label>
+          <select id="select-mes" value={mesAtivo} onChange={lidarComMudancaMes} style={{ padding: "6px 12px", borderRadius: "4px" }}>
+            {LISTA_MESES.map((m) => (
+              <option key={m.id} value={m.id}>{m.nome}</option>
+            ))}
+          </select>
+        </section>
+      )}
 
       {mensagem && (
         <div className="estatisticas-erro">
@@ -248,11 +259,13 @@ function Estatisticas() {
           <section className="estatisticas-destaques">
             <GoleiroMes
               tipo="goleiro"
+              tituloCustomizado={tituloCardDefesa} // Nova propriedade dinâmica
               goleiro={melhorGoleiro}
             />
 
             <GoleiroMes
               tipo="artilheiro"
+              tituloCustomizado={tituloCardArtilheiro} // Nova propriedade dinâmica
               artilheiro={artilheiroDestaque}
             />
           </section>
@@ -295,6 +308,8 @@ function Estatisticas() {
     </main>
   );
 }
+
+
 
 function CabecalhoRanking({
   titulo,

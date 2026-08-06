@@ -4,12 +4,15 @@ function GoleiroMes({
   tipo = "goleiro",
   goleiro,
   artilheiro,
+  tituloCustomizado, // Adicionado para receber o título dinâmico do arquivo pai
 }) {
   const destaque =
     tipo === "artilheiro" ? artilheiro : goleiro;
 
-  const titulo =
-    tipo === "artilheiro"
+  // Lógica que define o título: usa o dinâmico com emoji ou o padrão antigo caso falhe
+  const titulo = tituloCustomizado 
+    ? `${tipo === "artilheiro" ? "⚽" : "👑"} ${tituloCustomizado.toUpperCase()}`
+    : tipo === "artilheiro"
       ? "⚽ ARTILHEIRO"
       : "👑 DESTAQUE DA DEFESA";
 
