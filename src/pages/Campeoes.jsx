@@ -248,6 +248,28 @@ function Campeoes() {
     }
   }
 
+  const dadosExibidos =
+    historico.length > 0
+      ? historico
+      : [
+          {
+            id: 0,
+            mes: mesSelecionado,
+            ano: anoSelecionado,
+            campeao: "Aguardando definição",
+            vice: "Aguardando definição",
+            terceiro: "Aguardando definição",
+            artilheiro: "Sem registro",
+            gols_artilheiro: 0,
+            goleiro: "Sem registro",
+            gols_sofridos_goleiro: 0,
+            jogos_goleiro: 0,
+            foto_campeao_url: null,
+            foto_vice_url: null,
+            foto_terceiro_url: null,
+          },
+        ];
+
   return (
     <main className="page">
       <section
@@ -353,16 +375,9 @@ function Campeoes() {
 
       {carregando ? (
         <p style={{ textAlign: "center", color: "#fff" }}>Carregando galeria...</p>
-      ) : historico.length === 0 ? (
-        <section className="panel" style={{ textAlign: "center", padding: "32px" }}>
-          <h3 style={{ marginTop: 0 }}>Nenhum registro para este período</h3>
-          <p style={{ color: "#aaa" }}>
-            Não encontramos pódios ou destaques salvos para {formatarMesExtenso(mesSelecionado, anoSelecionado)}.
-          </p>
-        </section>
       ) : (
         <section style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {historico.map((item) => (
+          {dadosExibidos.map((item) => (
             <article
               key={item.id}
               style={{
@@ -387,7 +402,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#eab308", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🏆 1º LUGAR (CAMPEÃO)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.campeao}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
+                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
                   </div>
                 </div>
 
@@ -396,7 +411,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#94a3b8", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥈 2º LUGAR (VICE)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.vice}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
+                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
                   </div>
                 </div>
                 <div style={{ background: "#1e293b", border: "1px solid #cd7f32", borderRadius: "10px", overflow: "hidden" }}>
@@ -404,7 +419,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#cd7f32", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥉 3º LUGAR</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.terceiro}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
+                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
                   </div>
                 </div>
 
