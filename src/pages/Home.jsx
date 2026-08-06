@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { escudoTime } from "../escudos";
-
+function capitalizarNome(nome = "") {
+  return String(nome)
+    .toLowerCase()
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
 function Home() {
   const [dados, setDados] = useState({
     lider: null,
@@ -530,7 +534,7 @@ function Home() {
           {dados.artilheiro ? (
             <div className="award-content">
               <div className="highlight-info">
-                <h2>{dados.artilheiro.nome}</h2>
+               <h2>{capitalizarNome(dados.artilheiro.nome)}</h2>
                 <p>
                   {dados.artilheiro.gols ?? 0} gols
                   {nomeTimeArtilheiro ? ` · ${nomeTimeArtilheiro}` : ""}
@@ -563,7 +567,7 @@ function Home() {
           {dados.melhorGoleiro ? (
             <div className="award-content">
               <div className="highlight-info">
-                <h2>{dados.melhorGoleiro.nome}</h2>
+                <h2>{capitalizarNome(dados.melhorGoleiro.nome)}</h2>
                 <p>
                   {dados.melhorGoleiro.jogos_goleiro ?? 0} jogos ·{" "}
                   {dados.melhorGoleiro.gols_sofridos ?? 0} gols sofridos ·{" "}
