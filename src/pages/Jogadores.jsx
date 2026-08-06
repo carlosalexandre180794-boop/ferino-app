@@ -466,8 +466,8 @@ function Jogadores() {
           display: grid;
           grid-template-columns:
             42px
-            minmax(0, 0.92fr)
-            minmax(0, 1.08fr);
+            minmax(86px, 0.72fr)
+            minmax(170px, 1.48fr);
           align-items: center;
           column-gap: 12px;
         }
@@ -492,6 +492,8 @@ function Jogadores() {
 
         .jogadores-page .player-row {
           position: relative;
+          user-select: none;
+          -webkit-user-select: none;
           width: 100%;
           min-width: 0;
           min-height: 62px;
@@ -560,6 +562,9 @@ function Jogadores() {
           background: #101f37;
           font-weight: 800;
           cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .jogadores-page .player-picker-button:hover,
@@ -579,15 +584,26 @@ function Jogadores() {
           font-size: 0.88rem;
           font-weight: 800;
           line-height: 1.15;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+          overflow-wrap: anywhere;
           text-align: left;
         }
 
         .jogadores-page .player-picker-arrow {
-          color: #ffffff;
-          font-size: 0.78rem;
+          width: 20px;
+          height: 20px;
+          display: grid;
+          place-items: center;
+          color: #cbd5e1;
+          background: transparent;
+          border: 0;
+          border-radius: 0;
+          font-size: 0.72rem;
+          line-height: 1;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .jogadores-page .player-picker-menu {
@@ -657,7 +673,8 @@ function Jogadores() {
           border: 1px solid rgba(96, 165, 250, 0.45);
           font-size: 0.88rem;
           font-weight: 800;
-          white-space: nowrap;
+          white-space: normal;
+          overflow-wrap: anywhere;
         }
 
         .jogadores-page .substitution-box {
@@ -710,8 +727,8 @@ function Jogadores() {
           .jogadores-page .player-row {
             grid-template-columns:
               34px
-              minmax(0, 0.92fr)
-              minmax(0, 1.08fr);
+              minmax(72px, 0.68fr)
+              minmax(138px, 1.45fr);
             column-gap: 7px;
           }
 
