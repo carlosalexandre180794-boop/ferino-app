@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { escudoTime } from "../escudos";
 import AdminLogin from "../components/AdminLogin";
@@ -7,81 +7,218 @@ import {
   desativarModoAdmin,
 } from "../auth/adminAuth";
 
+const MESES = [
+  { valor: 1, nome: "Janeiro" },
+  { valor: 2, nome: "Fevereiro" },
+  { valor: 3, nome: "Março" },
+  { valor: 4, nome: "Abril" },
+  { valor: 5, nome: "Maio" },
+  { valor: 6, nome: "Junho" },
+  { valor: 7, nome: "Julho" },
+  { valor: 8, nome: "Agosto" },
+  { valor: 9, nome: "Setembro" },
+  { valor: 10, nome: "Outubro" },
+  { valor: 11, nome: "Novembro" },
+  { valor: 12, nome: "Dezembro" },
+];
+
+const ANO_INICIAL = 2026;
+const ANO_ATUAL = new Date().getFullYear();
+const ANOS = Array.from(
+  { length: Math.max(1, ANO_ATUAL - ANO_INICIAL + 4) },
+  (_, indice) => ANO_INICIAL + indice
+);
+
 function Jogadores() {
-  const [jogadores, setJogadores] = useState([]);
+  const agora = new Date();
+
+  const [anoSelecionado, setAnoSelecionado] = useState(
+    Math.max(ANO_INICIAL, agora.getFullYear())
+  );
+  const [mesSelecionado, setMesSelecionado] = useState(
+    agora.getFullYear() === ANO_INICIAL ? agora.getMonth() + 1 : 1
+  );
+
+  const [temporadaId, setTemporadaId] = useState(null);
+  const [jogadoresBase, setJogadoresBase] = useState([]);
+  const [elencos, setElencos] = useState([]);
   const [times, setTimes] = useState([]);
+  const [substituicoes, setSubstituicoes] = useState([]);
+
   const [carregando, setCarregando] = useState(true);
   const [salvandoTroca, setSalvandoTroca] = useState(false);
-  const [adminLiberado, setAdminLiberado] = useState(
-    adminEstaAtivo()
-  );
+  const [adminLiberado, setAdminLiberado] = useState(adminEstaAtivo());
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [seletorAberto, setSeletorAberto] = useState(null);
 
   useEffect(() => {
-    async function carregarDados() {
-      try {
-        const [resJogadores, resTimes] = await Promise.all([
-          supabase
-            .from("jogadores")
-            .select(`
+    carregarDadosFixos();
+  }, []);
+
+  useEffect(() => {
+    if (times.length > 0 && jogadoresBase.length > 0) {
+      carregarElencoMensal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anoSelecionado, mesSelecionado, times.length, jogadoresBase.length]);
+
+  async function carregarDadosFixos() {
+    setCarregando(true);
+    setMensagem("");
+
+    try {
+      const [resJogadores, resTimes] = await Promise.all([
+        supabase
+          .from("jogadores")
+          .select(`
+            id,
+            nome,
+            capitao,
+            jogos,
+            gols,
+            time_id,
+            ativo,
+            times (
               id,
               nome,
-              capitao,
-              jogos,
-              gols,
-              time_id,
-              times (
-                id,
-                nome,
-                escudo
-              )
-            `)
-            .eq("ativo", true)
-            .order("nome", { ascending: true }),
+              escudo
+            )
+          `)
+          .eq("ativo", true)
+          .order("nome", { ascending: true }),
 
-          supabase
-            .from("times")
-            .select("id, nome, escudo")
-            .order("nome", { ascending: true }),
-        ]);
+        supabase
+          .from("times")
+          .select("id, nome, escudo")
+          .order("nome", { ascending: true }),
+      ]);
 
-        if (resJogadores.error) {
-          throw new Error(
-            `Erro ao buscar jogadores: ${resJogadores.error.message}`
-          );
-        }
-
-        if (resTimes.error) {
-          throw new Error(
-            `Erro ao buscar times: ${resTimes.error.message}`
-          );
-        }
-
-        setJogadores(resJogadores.data || []);
-        setTimes(resTimes.data || []);
-      } catch (erro) {
-        console.error("Erro ao carregar jogadores:", erro);
-        setMensagem(
-          erro.message ||
-            "Não foi possível carregar os jogadores."
+      if (resJogadores.error) {
+        throw new Error(
+          `Erro ao buscar jogadores: ${resJogadores.error.message}`
         );
-      } finally {
-        setCarregando(false);
       }
-    }
 
-    carregarDados();
-  }, []);
+      if (resTimes.error) {
+        throw new Error(
+          `Erro ao buscar times: ${resTimes.error.message}`
+        );
+      }
+
+      setJogadoresBase(resJogadores.data || []);
+      setTimes(resTimes.data || []);
+    } catch (erro) {
+      console.error("Erro ao carregar dados fixos:", erro);
+      setMensagem(
+        erro.message || "Não foi possível carregar jogadores e times."
+      );
+      setCarregando(false);
+    }
+  }
+
+  async function carregarElencoMensal() {
+    setCarregando(true);
+    setMensagem("");
+    setSeletorAberto(null);
+
+    try {
+      /*
+       * A função cria a competência e, somente se estiver vazia,
+       * copia o elenco atual como ponto de partida.
+       * Depois disso, cada mês passa a ter seu próprio elenco.
+       */
+      const { data: idCriado, error: erroCriar } = await supabase.rpc(
+        "ferino_criar_elenco_mes",
+        {
+          p_ano: Number(anoSelecionado),
+          p_mes: Number(mesSelecionado),
+        }
+      );
+
+      if (erroCriar) {
+        throw new Error(
+          `Erro ao preparar o elenco mensal: ${erroCriar.message}`
+        );
+      }
+
+      const idCompetencia = Number(idCriado);
+      setTemporadaId(idCompetencia);
+
+      const [resElencos, resSubstituicoes] = await Promise.all([
+        supabase
+          .from("elencos")
+          .select(`
+            id,
+            temporada_id,
+            time_id,
+            jogador_id,
+            posicao,
+            capitao,
+            ativo,
+            jogador_nome_snapshot,
+            time_nome_snapshot
+          `)
+          .eq("temporada_id", idCompetencia)
+          .eq("ativo", true)
+          .order("time_id", { ascending: true })
+          .order("posicao", { ascending: true }),
+
+        supabase
+          .from("substituicoes")
+          .select(`
+            id,
+            temporada_id,
+            time_id,
+            partida_id,
+            rodada,
+            data_substituicao,
+            jogador_saida_id,
+            jogador_saida_nome_snapshot,
+            jogador_entrada_id,
+            jogador_entrada_nome_snapshot,
+            motivo,
+            status
+          `)
+          .eq("temporada_id", idCompetencia)
+          .eq("status", "ativa")
+          .order("data_substituicao", { ascending: false }),
+      ]);
+
+      if (resElencos.error) {
+        throw new Error(
+          `Erro ao buscar o elenco mensal: ${resElencos.error.message}`
+        );
+      }
+
+      if (resSubstituicoes.error) {
+        throw new Error(
+          `Erro ao buscar substituições: ${resSubstituicoes.error.message}`
+        );
+      }
+
+      setElencos(resElencos.data || []);
+      setSubstituicoes(resSubstituicoes.data || []);
+    } catch (erro) {
+      console.error("Erro ao carregar elenco mensal:", erro);
+      setElencos([]);
+      setSubstituicoes([]);
+      setMensagem(
+        erro.message || "Não foi possível carregar o elenco deste mês."
+      );
+    } finally {
+      setCarregando(false);
+    }
+  }
 
   async function trocarJogadores(jogadorAtualId, jogadorEscolhidoId) {
     setSeletorAberto(null);
+
     if (!adminEstaAtivo()) {
       setAdminLiberado(false);
       setMostrarLogin(true);
       setMensagem(
-        "Acesso restrito. Digite a senha de administrador para alterar jogadores."
+        "Acesso restrito. Digite a senha de administrador para alterar o elenco."
       );
       return;
     }
@@ -91,9 +228,10 @@ function Jogadores() {
 
     if (
       !Number.isFinite(atualId) ||
-      !Number.isFinite(escolhidoId)
+      !Number.isFinite(escolhidoId) ||
+      !Number.isFinite(Number(temporadaId))
     ) {
-      setMensagem("O jogador selecionado é inválido.");
+      setMensagem("O jogador ou a competência selecionada é inválida.");
       return;
     }
 
@@ -101,11 +239,10 @@ function Jogadores() {
       return;
     }
 
-    const jogadorAtual = jogadores.find(
+    const jogadorAtual = jogadoresBase.find(
       (jogador) => Number(jogador.id) === atualId
     );
-
-    const jogadorEscolhido = jogadores.find(
+    const jogadorEscolhido = jogadoresBase.find(
       (jogador) => Number(jogador.id) === escolhidoId
     );
 
@@ -114,92 +251,52 @@ function Jogadores() {
       return;
     }
 
-    const timeAtualId = Number(jogadorAtual.time_id);
-    const timeEscolhidoId = Number(jogadorEscolhido.time_id);
+    const registroAtual = elencos.find(
+      (registro) => Number(registro.jogador_id) === atualId
+    );
+    const registroEscolhido = elencos.find(
+      (registro) => Number(registro.jogador_id) === escolhidoId
+    );
 
-    if (timeAtualId === timeEscolhidoId) {
+    if (!registroAtual || !registroEscolhido) {
       setMensagem(
-        "Os dois jogadores já pertencem ao mesmo time."
+        "Os dois jogadores precisam pertencer ao elenco do mês selecionado."
       );
       return;
     }
 
-    const timeAtual = times.find(
-      (time) => Number(time.id) === timeAtualId
-    );
-
-    const timeEscolhido = times.find(
-      (time) => Number(time.id) === timeEscolhidoId
-    );
+    if (Number(registroAtual.time_id) === Number(registroEscolhido.time_id)) {
+      setMensagem("Os dois jogadores já pertencem ao mesmo time neste mês.");
+      return;
+    }
 
     setSalvandoTroca(true);
     setMensagem("");
 
     try {
-      const { error: erroPrimeiraTroca } = await supabase
-        .from("jogadores")
-        .update({
-          time_id: timeEscolhidoId,
-          capitao: Boolean(jogadorEscolhido.capitao),
-        })
-        .eq("id", atualId);
-
-      if (erroPrimeiraTroca) {
-        throw new Error(erroPrimeiraTroca.message);
-      }
-
-      const { error: erroSegundaTroca } = await supabase
-        .from("jogadores")
-        .update({
-          time_id: timeAtualId,
-          capitao: Boolean(jogadorAtual.capitao),
-        })
-        .eq("id", escolhidoId);
-
-      if (erroSegundaTroca) {
-        await supabase
-          .from("jogadores")
-          .update({
-            time_id: timeAtualId,
-            capitao: Boolean(jogadorAtual.capitao),
-          })
-          .eq("id", atualId);
-
-        throw new Error(erroSegundaTroca.message);
-      }
-
-      setJogadores((listaAtual) =>
-        listaAtual.map((jogador) => {
-          if (Number(jogador.id) === atualId) {
-            return {
-              ...jogador,
-              time_id: timeEscolhidoId,
-              capitao: Boolean(jogadorEscolhido.capitao),
-              times: timeEscolhido || jogador.times,
-            };
-          }
-
-          if (Number(jogador.id) === escolhidoId) {
-            return {
-              ...jogador,
-              time_id: timeAtualId,
-              capitao: Boolean(jogadorAtual.capitao),
-              times: timeAtual || jogador.times,
-            };
-          }
-
-          return jogador;
-        })
+      const { error } = await supabase.rpc(
+        "ferino_trocar_jogadores_elenco",
+        {
+          p_temporada_id: Number(temporadaId),
+          p_jogador_a_id: atualId,
+          p_jogador_b_id: escolhidoId,
+        }
       );
 
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await carregarElencoMensal();
+
       setMensagem(
-        `✅ ${jogadorAtual.nome} e ${jogadorEscolhido.nome} trocaram de time.`
+        `✅ ${jogadorAtual.nome} e ${jogadorEscolhido.nome} trocaram de time somente em ${nomeMesSelecionado} de ${anoSelecionado}.`
       );
     } catch (erro) {
-      console.error("Erro ao trocar jogadores:", erro);
+      console.error("Erro ao trocar jogadores no elenco mensal:", erro);
       setMensagem(
         erro.message ||
-          "Não foi possível realizar a troca dos jogadores."
+          "Não foi possível realizar a troca no elenco deste mês."
       );
     } finally {
       setSalvandoTroca(false);
@@ -210,23 +307,68 @@ function Jogadores() {
     desativarModoAdmin();
     setAdminLiberado(false);
     setMostrarLogin(false);
+    setSeletorAberto(null);
     setMensagem("Modo administrador encerrado.");
   }
 
-  const jogadoresPorTime = times.map((time) => ({
-    ...time,
-    jogadores: jogadores
-      .filter(
-        (jogador) =>
-          Number(jogador.time_id) === Number(time.id)
-      )
-      .sort(
-        (a, b) =>
-          Number(Boolean(b.capitao)) -
-            Number(Boolean(a.capitao)) ||
-          a.nome.localeCompare(b.nome, "pt-BR")
-      ),
-  }));
+  const nomeMesSelecionado =
+    MESES.find((mes) => mes.valor === Number(mesSelecionado))?.nome ||
+    "Mês";
+
+  const jogadoresDoMes = useMemo(() => {
+    const mapaJogadores = new Map(
+      jogadoresBase.map((jogador) => [Number(jogador.id), jogador])
+    );
+
+    return elencos.map((registro) => {
+      const cadastro = mapaJogadores.get(Number(registro.jogador_id));
+
+      return {
+        ...cadastro,
+        id: Number(registro.jogador_id),
+        nome:
+          registro.jogador_nome_snapshot ||
+          cadastro?.nome ||
+          "Jogador sem nome",
+        time_id: Number(registro.time_id),
+        posicao: Number(registro.posicao),
+        capitao: Boolean(registro.capitao),
+        elenco_id: registro.id,
+      };
+    });
+  }, [elencos, jogadoresBase]);
+
+  const jogadoresPorTime = useMemo(
+    () =>
+      times.map((time) => ({
+        ...time,
+        jogadores: jogadoresDoMes
+          .filter(
+            (jogador) =>
+              Number(jogador.time_id) === Number(time.id)
+          )
+          .sort(
+            (a, b) =>
+              Number(a.posicao) - Number(b.posicao) ||
+              a.nome.localeCompare(b.nome, "pt-BR")
+          ),
+      })),
+    [times, jogadoresDoMes]
+  );
+
+  const substituicaoPorJogadorSaida = useMemo(() => {
+    const mapa = new Map();
+
+    substituicoes.forEach((substituicao) => {
+      const chave = Number(substituicao.jogador_saida_id);
+
+      if (!mapa.has(chave)) {
+        mapa.set(chave, substituicao);
+      }
+    });
+
+    return mapa;
+  }, [substituicoes]);
 
   return (
     <main className="page jogadores-page">
@@ -234,6 +376,51 @@ function Jogadores() {
         .jogadores-page,
         .jogadores-page * {
           box-sizing: border-box;
+        }
+
+        .jogadores-page .competencia-card {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 220px));
+          gap: 12px;
+          margin: 18px 0 20px;
+          padding: 16px;
+          border-radius: 14px;
+          background: #0e1b31;
+          border: 1px solid rgba(96, 165, 250, 0.25);
+        }
+
+        .jogadores-page .competencia-field {
+          display: grid;
+          gap: 7px;
+        }
+
+        .jogadores-page .competencia-field label {
+          color: #aab6ca;
+          font-size: 0.74rem;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .jogadores-page .competencia-field select {
+          width: 100%;
+          min-height: 46px;
+          padding: 0 12px;
+          border: 1px solid rgba(96, 165, 250, 0.6);
+          border-radius: 10px;
+          color: #ffffff;
+          background: #101f37;
+          font: inherit;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .jogadores-page .competencia-resumo {
+          grid-column: 1 / -1;
+          margin: 0;
+          color: #8dd8ff;
+          font-size: 0.92rem;
+          font-weight: 800;
         }
 
         .jogadores-page .players-grid {
@@ -295,7 +482,6 @@ function Jogadores() {
           text-transform: uppercase;
           border-top: 1px solid rgba(148, 163, 184, 0.18);
           border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-          background: transparent;
         }
 
         .jogadores-page .players-list {
@@ -307,9 +493,7 @@ function Jogadores() {
         .jogadores-page .player-row {
           position: relative;
           width: 100%;
-          max-width: 100%;
           min-width: 0;
-          overflow: visible;
           min-height: 62px;
           padding: 8px 10px;
           border-radius: 12px;
@@ -337,7 +521,6 @@ function Jogadores() {
           align-items: center;
           gap: 9px;
           color: #ffffff;
-          overflow: hidden;
         }
 
         .jogadores-page .fixed-team img {
@@ -349,31 +532,21 @@ function Jogadores() {
 
         .jogadores-page .fixed-team span {
           min-width: 0;
-          color: #ffffff !important;
-          background: transparent !important;
-          border: 0 !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          padding: 0 !important;
+          color: #ffffff;
           font-size: 0.92rem;
           font-weight: 800;
           line-height: 1.15;
           white-space: nowrap;
-          overflow: visible;
-          text-overflow: clip;
-          user-select: none;
         }
 
         .jogadores-page .player-picker {
           position: relative;
           width: 100%;
           min-width: 0;
-          max-width: 100%;
         }
 
         .jogadores-page .player-picker-button {
           width: 100%;
-          max-width: 100%;
           min-width: 0;
           min-height: 44px;
           display: grid;
@@ -387,7 +560,6 @@ function Jogadores() {
           background: #101f37;
           font-weight: 800;
           cursor: pointer;
-          user-select: none;
         }
 
         .jogadores-page .player-picker-button:hover,
@@ -402,33 +574,20 @@ function Jogadores() {
         }
 
         .jogadores-page .player-picker-label {
-          display: block;
           min-width: 0;
-          color: #ffffff !important;
-          background: transparent !important;
-          border: 0 !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          padding: 0 !important;
+          color: #ffffff;
           font-size: 0.88rem;
           font-weight: 800;
           line-height: 1.15;
           white-space: nowrap;
-          overflow: visible;
-          text-overflow: clip;
+          overflow: hidden;
+          text-overflow: ellipsis;
           text-align: left;
-          user-select: none;
         }
 
         .jogadores-page .player-picker-arrow {
-          display: grid;
-          place-items: center;
           color: #ffffff;
-          background: transparent !important;
-          border: 0 !important;
-          padding: 0 !important;
           font-size: 0.78rem;
-          user-select: none;
         }
 
         .jogadores-page .player-picker-menu {
@@ -438,8 +597,6 @@ function Jogadores() {
           right: 0;
           z-index: 100;
           width: 100%;
-          min-width: 100%;
-          max-width: 100%;
           max-height: 320px;
           overflow-x: hidden;
           overflow-y: auto;
@@ -450,18 +607,8 @@ function Jogadores() {
           box-shadow: 0 20px 44px rgba(0, 0, 0, 0.58);
         }
 
-        .jogadores-page .player-picker-menu::-webkit-scrollbar {
-          width: 7px;
-        }
-
-        .jogadores-page .player-picker-menu::-webkit-scrollbar-thumb {
-          border-radius: 8px;
-          background: rgba(148, 163, 184, 0.72);
-        }
-
         .jogadores-page .player-picker-option {
           width: 100%;
-          min-width: 0;
           min-height: 40px;
           display: grid;
           grid-template-columns: 28px minmax(0, 1fr);
@@ -474,7 +621,6 @@ function Jogadores() {
           background: transparent;
           text-align: left;
           cursor: pointer;
-          user-select: none;
         }
 
         .jogadores-page .player-picker-option:hover,
@@ -490,19 +636,13 @@ function Jogadores() {
 
         .jogadores-page .player-picker-option span {
           min-width: 0;
-          color: #ffffff !important;
-          background: transparent !important;
-          border: 0 !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          padding: 0 !important;
+          color: #ffffff;
           font-size: 0.87rem;
           font-weight: 700;
           line-height: 1.2;
           white-space: nowrap;
-          overflow: visible;
-          text-overflow: clip;
-          user-select: none;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .jogadores-page .player-name-readonly {
@@ -518,13 +658,29 @@ function Jogadores() {
           font-size: 0.88rem;
           font-weight: 800;
           white-space: nowrap;
-          overflow: visible;
-          text-overflow: clip;
         }
 
-        .jogadores-page ::selection {
-          color: #ffffff;
-          background: transparent;
+        .jogadores-page .substitution-box {
+          min-width: 0;
+          display: grid;
+          gap: 3px;
+          padding: 7px 10px;
+          border-radius: 10px;
+          background: #101f37;
+          border: 1px solid rgba(96, 165, 250, 0.45);
+          line-height: 1.1;
+        }
+
+        .jogadores-page .substitution-in {
+          color: #4ade80;
+          font-size: 0.82rem;
+          font-weight: 900;
+        }
+
+        .jogadores-page .substitution-out {
+          color: #f87171;
+          font-size: 0.82rem;
+          font-weight: 900;
         }
 
         @media (max-width: 1120px) {
@@ -534,6 +690,11 @@ function Jogadores() {
         }
 
         @media (max-width: 700px) {
+          .jogadores-page .competencia-card {
+            grid-template-columns: 1fr 1fr;
+            padding: 12px;
+          }
+
           .jogadores-page .team-card-header {
             min-height: 104px;
             padding: 16px 18px;
@@ -586,31 +747,10 @@ function Jogadores() {
             flex-basis: 26px;
           }
 
-          .jogadores-page .fixed-team span {
-            font-size: 0.74rem;
-            white-space: nowrap;
-          }
-
-          .jogadores-page .player-picker-button,
+          .jogadores-page .fixed-team span,
+          .jogadores-page .player-picker-label,
           .jogadores-page .player-name-readonly {
-            min-height: 39px;
-            padding-left: 9px;
-          }
-
-          .jogadores-page .player-picker-label {
             font-size: 0.74rem;
-            white-space: nowrap;
-          }
-
-          .jogadores-page .player-picker-menu {
-            width: 100%;
-            min-width: 100%;
-            max-width: 100%;
-            max-height: 300px;
-          }
-
-          .jogadores-page .player-picker-option span {
-            font-size: 0.82rem;
           }
         }
       `}</style>
@@ -620,16 +760,57 @@ function Jogadores() {
         <h2>Jogadores</h2>
 
         <p>
-          Os times permanecem fixos. No modo administrador,
-          selecione um jogador para trocar sua equipe.
+          Selecione o mês e o ano. Cada competência mantém seu próprio
+          elenco sem alterar os registros dos outros meses.
         </p>
+
+        <div className="competencia-card">
+          <div className="competencia-field">
+            <label htmlFor="elenco-mes">Mês</label>
+            <select
+              id="elenco-mes"
+              value={mesSelecionado}
+              disabled={carregando || salvandoTroca}
+              onChange={(evento) =>
+                setMesSelecionado(Number(evento.target.value))
+              }
+            >
+              {MESES.map((mes) => (
+                <option key={mes.valor} value={mes.valor}>
+                  {mes.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="competencia-field">
+            <label htmlFor="elenco-ano">Ano</label>
+            <select
+              id="elenco-ano"
+              value={anoSelecionado}
+              disabled={carregando || salvandoTroca}
+              onChange={(evento) =>
+                setAnoSelecionado(Number(evento.target.value))
+              }
+            >
+              {ANOS.map((ano) => (
+                <option key={ano} value={ano}>
+                  {ano}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="competencia-resumo">
+            Elenco de {nomeMesSelecionado} de {anoSelecionado}
+          </p>
+        </div>
 
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
             gap: "10px",
-            marginTop: "14px",
           }}
         >
           {!adminLiberado ? (
@@ -700,13 +881,11 @@ function Jogadores() {
       {mostrarLogin && !adminLiberado && (
         <AdminLogin
           titulo="Área administrativa"
-          descricao="Digite a senha para liberar a troca dos jogadores entre os times."
+          descricao="Digite a senha para liberar a edição do elenco mensal."
           onLiberado={() => {
             setAdminLiberado(true);
             setMostrarLogin(false);
-            setMensagem(
-              "✅ Edição administrativa liberada."
-            );
+            setMensagem("✅ Edição administrativa liberada.");
           }}
           onCancelar={() => {
             setMostrarLogin(false);
@@ -719,7 +898,7 @@ function Jogadores() {
 
       {carregando ? (
         <p style={{ color: "#fff", textAlign: "center" }}>
-          Carregando jogadores...
+          Carregando elenco de {nomeMesSelecionado} de {anoSelecionado}...
         </p>
       ) : (
         <section className="players-grid">
@@ -744,121 +923,120 @@ function Jogadores() {
               </div>
 
               <div className="players-list">
-                {time.jogadores.map((jogador, index) => (
-                  <div
-                    className="player-row"
-                    key={jogador.id}
-                  >
-                    <strong className="player-number">
-                      {index + 1}
-                    </strong>
+                {time.jogadores.map((jogador) => {
+                  const substituicao =
+                    substituicaoPorJogadorSaida.get(Number(jogador.id));
 
-                    <div className="fixed-team">
-                      <img
-                        src={escudoTime(time.nome)}
-                        alt={`Escudo do ${time.nome}`}
-                      />
-                      <span title={time.nome}>
-                        {time.nome}
-                      </span>
-                    </div>
+                  return (
+                    <div className="player-row" key={jogador.elenco_id}>
+                      <strong className="player-number">
+                        {jogador.posicao}
+                      </strong>
 
-                    {adminLiberado ? (
-                      <div className="player-picker">
-                        <button
-                          type="button"
-                          className="player-picker-button"
-                          disabled={salvandoTroca}
-                          onClick={() =>
-                            setSeletorAberto((aberto) =>
-                              aberto === jogador.id
-                                ? null
-                                : jogador.id
-                            )
-                          }
-                          aria-expanded={
-                            seletorAberto === jogador.id
-                          }
-                          aria-label={`Selecionar jogador para a posição ${index + 1} do ${time.nome}`}
-                        >
-                          <span className="player-picker-label">
-                            {jogador.nome}
-                            {jogador.capitao ? " (C)" : ""}
+                      <div className="fixed-team">
+                        <img
+                          src={escudoTime(time.nome)}
+                          alt={`Escudo do ${time.nome}`}
+                        />
+                        <span title={time.nome}>{time.nome}</span>
+                      </div>
+
+                      {substituicao ? (
+                        <div className="substitution-box">
+                          <span className="substitution-in">
+                            ▲ {substituicao.jogador_entrada_nome_snapshot}
                           </span>
-
-                          <span className="player-picker-arrow">
-                            ▾
+                          <span className="substitution-out">
+                            ▼ {substituicao.jogador_saida_nome_snapshot}
                           </span>
-                        </button>
-
-                        {seletorAberto === jogador.id && (
-                          <div className="player-picker-menu">
-                            {jogadores
-                              .slice()
-                              .sort((a, b) =>
-                                a.nome.localeCompare(
-                                  b.nome,
-                                  "pt-BR"
-                                )
+                        </div>
+                      ) : adminLiberado ? (
+                        <div className="player-picker">
+                          <button
+                            type="button"
+                            className="player-picker-button"
+                            disabled={salvandoTroca}
+                            onClick={() =>
+                              setSeletorAberto((aberto) =>
+                                aberto === jogador.elenco_id
+                                  ? null
+                                  : jogador.elenco_id
                               )
-                              .map((opcao) => {
-                                const nomeTimeOpcao =
-                                  opcao.times?.nome ||
-                                  times.find(
+                            }
+                            aria-expanded={
+                              seletorAberto === jogador.elenco_id
+                            }
+                            aria-label={`Selecionar jogador para a posição ${jogador.posicao} do ${time.nome}`}
+                          >
+                            <span className="player-picker-label">
+                              {jogador.nome}
+                              {jogador.capitao ? " (C)" : ""}
+                            </span>
+
+                            <span className="player-picker-arrow">▾</span>
+                          </button>
+
+                          {seletorAberto === jogador.elenco_id && (
+                            <div className="player-picker-menu">
+                              {jogadoresDoMes
+                                .slice()
+                                .sort((a, b) =>
+                                  a.nome.localeCompare(b.nome, "pt-BR")
+                                )
+                                .map((opcao) => {
+                                  const timeOpcao = times.find(
                                     (item) =>
                                       Number(item.id) ===
                                       Number(opcao.time_id)
-                                  )?.nome ||
-                                  "Sem time";
+                                  );
 
-                                return (
-                                  <button
-                                    type="button"
-                                    key={opcao.id}
-                                    className={`player-picker-option ${
-                                      Number(opcao.id) ===
-                                      Number(jogador.id)
-                                        ? "ativo"
-                                        : ""
-                                    }`}
-                                    onClick={() =>
-                                      trocarJogadores(
-                                        jogador.id,
-                                        opcao.id
-                                      )
-                                    }
-                                  >
-                                    <img
-                                      src={escudoTime(
-                                        nomeTimeOpcao
-                                      )}
-                                      alt=""
-                                      aria-hidden="true"
-                                    />
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={opcao.id}
+                                      className={`player-picker-option ${
+                                        Number(opcao.id) ===
+                                        Number(jogador.id)
+                                          ? "ativo"
+                                          : ""
+                                      }`}
+                                      onClick={() =>
+                                        trocarJogadores(
+                                          jogador.id,
+                                          opcao.id
+                                        )
+                                      }
+                                    >
+                                      <img
+                                        src={escudoTime(
+                                          timeOpcao?.nome || "Sem time"
+                                        )}
+                                        alt=""
+                                        aria-hidden="true"
+                                      />
 
-                                    <span>
-                                      {opcao.nome}
-                                      {opcao.capitao
-                                        ? " (C)"
-                                        : ""}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div
-                        className="player-name-readonly"
-                        title={jogador.nome}
-                      >
-                        {jogador.nome}
-                        {jogador.capitao ? " (C)" : ""}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                                      <span>
+                                        {opcao.nome}
+                                        {opcao.capitao ? " (C)" : ""}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          className="player-name-readonly"
+                          title={jogador.nome}
+                        >
+                          {jogador.nome}
+                          {jogador.capitao ? " (C)" : ""}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {time.jogadores.length === 0 && (
                   <p
@@ -867,7 +1045,7 @@ function Jogadores() {
                       padding: "14px",
                     }}
                   >
-                    Nenhum jogador neste time.
+                    Nenhum jogador neste time neste mês.
                   </p>
                 )}
               </div>
