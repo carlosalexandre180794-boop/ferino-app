@@ -131,41 +131,45 @@ function Estatisticas() {
 
         const listaArtilhariaAnual = (
           respostaArtilhariaAnual.data || []
-        ).map((jogador) => ({
-          id: jogador.id,
-          nome: jogador.nome,
-          goleiro: Boolean(jogador.goleiro),
-          time: jogador.nome_time || "Sem time",
-          gols: Number(jogador.gols || 0),
-          jogos: Number(jogador.jogos || 0),
-        }));
+        )
+          .map((jogador) => ({
+            id: jogador.id,
+            nome: jogador.nome,
+            goleiro: Boolean(jogador.goleiro),
+            time: jogador.nome_time || "Sem time",
+            gols: Number(jogador.gols || 0),
+            jogos: Number(jogador.jogos || 0),
+          }))
+          .filter((jogador) => jogador.gols > 0);
 
         const listaGoleirosAnual = (
           respostaGoleirosAnual.data || []
-        ).map((goleiro) => ({
-          id: goleiro.id,
-          nome: goleiro.nome,
-          goleiro: true,
-          time: goleiro.nome_time || "Sem time",
-          jogosGoleiro: Number(
-            goleiro.jogos_goleiro || 0
-          ),
-          golsSofridos: Number(
-            goleiro.gols_sofridos || 0
-          ),
-          pontosTime: Number(
-            goleiro.pontos_time || 0
-          ),
-          saldoTime: Number(
-            goleiro.saldo_time || 0
-          ),
-          golsProTime: Number(
-            goleiro.gols_pro_time || 0
-          ),
-          media: Number(
-            goleiro.media || 0
-          ).toFixed(2),
-        }));
+        )
+          .map((goleiro) => ({
+            id: goleiro.id,
+            nome: goleiro.nome,
+            goleiro: true,
+            time: goleiro.nome_time || "Sem time",
+            jogosGoleiro: Number(
+              goleiro.jogos_goleiro || 0
+            ),
+            golsSofridos: Number(
+              goleiro.gols_sofridos || 0
+            ),
+            pontosTime: Number(
+              goleiro.pontos_time || 0
+            ),
+            saldoTime: Number(
+              goleiro.saldo_time || 0
+            ),
+            golsProTime: Number(
+              goleiro.gols_pro_time || 0
+            ),
+            media: Number(
+              goleiro.media || 0
+            ).toFixed(2),
+          }))
+          .filter((goleiro) => goleiro.jogosGoleiro > 0);
 
         setJogadoresMensais(listaMensal);
         setArtilheirosAnuais(listaArtilhariaAnual);
@@ -369,11 +373,13 @@ function Estatisticas() {
         </section>
       )}
 
-      {mensagem && (
-        <div className="estatisticas-erro">
-          {mensagem}
-        </div>
-      )}
+      {mensagem &&
+        (filtroArtilharia === "mes" ||
+          filtroGoleiros === "mes") && (
+          <div className="estatisticas-erro">
+            {mensagem}
+          </div>
+        )}
 
       {carregando ? (
         <p className="estatisticas-loading">
