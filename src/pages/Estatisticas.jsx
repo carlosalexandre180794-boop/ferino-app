@@ -71,6 +71,9 @@ function Estatisticas() {
               )
             `)
             .eq("ativo", true),
+          supabase
+            .from("times")
+            .select("*"),
         ];
 
         if (temporada?.id) {
@@ -106,6 +109,7 @@ function Estatisticas() {
           respostaArtilhariaAnual,
           respostaGoleirosAnual,
           respostaJogadoresAtuais,
+          respostaTimesAtuais,
         ] = await Promise.all(consultas);
 
         if (respostaMensal.error) throw respostaMensal.error;
@@ -118,6 +122,24 @@ function Estatisticas() {
         if (respostaJogadoresAtuais.error) {
           throw respostaJogadoresAtuais.error;
         }
+        if (respostaTimesAtuais.error) {
+          throw respostaTimesAtuais.error;
+        }
+
+        const classificacaoAtualPorTime = new Map(
+          (respostaTimesAtuais.data || []).map((time) => [
+            Number(time.id),
+            {
+              pontos: Number(time.pontos || 0),
+              saldo: Number(
+                time.saldo ?? time.saldo_gols ?? 0
+              ),
+              golsPro: Number(
+                time.gols_pro ?? time.gols_marcados ?? 0
+              ),
+            },
+          ])
+        );
 
         const dataAtual = new Date();
         const anoAtual = dataAtual.getFullYear();
@@ -161,23 +183,37 @@ function Estatisticas() {
 
         const listaMensalAtual = (
           respostaJogadoresAtuais.data || []
-        ).map((jogador) => ({
-          id: Number(jogador.id),
-          nome: jogador.nome || "Jogador não informado",
-          goleiro: Boolean(jogador.goleiro),
-          time: jogador.times?.nome || "Sem time",
-          gols: Number(jogador.gols || 0),
-          jogos: Number(jogador.jogos || 0),
-          jogosGoleiro: Number(
-            jogador.jogos_goleiro || 0
-          ),
-          golsSofridos: Number(
-            jogador.gols_sofridos || 0
-          ),
-          pontosTime: 0,
-          saldoTime: 0,
-          golsProTime: 0,
-        }));
+        ).map((jogador) => {
+          const classificacaoTime =
+            classificacaoAtualPorTime.get(
+              Number(jogador.time_id)
+            ) || {
+              pontos: 0,
+              saldo: 0,
+              golsPro: 0,
+            };
+
+          return {
+            id: Number(jogador.id),
+            nome:
+              jogador.nome ||
+              "Jogador não informado",
+            goleiro: Boolean(jogador.goleiro),
+            time:
+              jogador.times?.nome || "Sem time",
+            gols: Number(jogador.gols || 0),
+            jogos: Number(jogador.jogos || 0),
+            jogosGoleiro: Number(
+              jogador.jogos_goleiro || 0
+            ),
+            golsSofridos: Number(
+              jogador.gols_sofridos || 0
+            ),
+            pontosTime: classificacaoTime.pontos,
+            saldoTime: classificacaoTime.saldo,
+            golsProTime: classificacaoTime.golsPro,
+          };
+        });
 
         const listaMensal =
           listaMensalDoHistorico.length > 0
