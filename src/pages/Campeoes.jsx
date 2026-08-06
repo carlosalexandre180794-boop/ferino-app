@@ -433,26 +433,90 @@ foto_goleiro_url: null,
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "10px" }}>
                 
-                <div style={{ padding: "16px", borderRadius: "8px", background: "#0f172a", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={{ color: "#38bdf8", fontWeight: "bold", display: "block", marginBottom: "6px" }}>⚽ Artilheiro do Mês</span>
-                    <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.artilheiro}</strong>
-                  </div>
-                  <div style={{ textShadow: "none", textAlign: "right", background: "rgba(56, 189, 248, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
-                    <strong style={{ color: "#38bdf8", fontSize: "1.3rem", display: "block" }}>{item.gols_artilheiro}</strong>
-                    <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>{item.gols_artilheiro === 1 ? "gol" : "gols"}</span>
+                <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "220px",
+                      background: item.foto_artilheiro_url
+                        ? `url("${item.foto_artilheiro_url}") center/cover`
+                        : "linear-gradient(to bottom, rgba(14, 77, 120, 0.55), #0f172a)",
+                    }}
+                  />
+                  <div style={{ padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                      <div>
+                        <span style={{ color: "#38bdf8", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
+                          ⚽ Artilheiro do Mês
+                        </span>
+                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.artilheiro}</strong>
+                      </div>
+
+                      <div style={{ textShadow: "none", textAlign: "right", background: "rgba(56, 189, 248, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
+                        <strong style={{ color: "#38bdf8", fontSize: "1.3rem", display: "block" }}>
+                          {item.gols_artilheiro}
+                        </strong>
+                        <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
+                          {item.gols_artilheiro === 1 ? "gol" : "gols"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isAdmin && item.id !== 0 && (
+                      <SeletorFoto
+                        item={item}
+                        coluna="foto_artilheiro"
+                        rotulo="Artilheiro"
+                        uploadEmAndamento={uploadEmAndamento}
+                        enviarFoto={enviarFoto}
+                        removerFoto={removerFoto}
+                        url={item.foto_artilheiro_url}
+                      />
+                    )}
                   </div>
                 </div>
 
-                <div style={{ padding: "16px", borderRadius: "8px", background: "#0f172a", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={{ color: "#4ade80", fontWeight: "bold", display: "block", marginBottom: "6px" }}>🧤 Paredão do Mês</span>
-                    <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.goleiro}</strong>
-                    <small style={{ color: "#94a3b8", display: "block", marginTop: "4px" }}>{item.jogos_goleiro} jogos realizados</small>
-                  </div>
-                  <div style={{ textShadow: "none", textAlign: "right", background: "rgba(74, 222, 128, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
-                    <strong style={{ color: "#4ade80", fontSize: "1.3rem", display: "block" }}>-{item.gols_sofridos_goleiro}</strong>
-                    <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>{item.gols_sofridos_goleiro === 1 ? "gol sofrido" : "gols sofridos"}</span>
+                <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "220px",
+                      background: item.foto_goleiro_url
+                        ? `url("${item.foto_goleiro_url}") center/cover`
+                        : "linear-gradient(to bottom, rgba(22, 101, 52, 0.55), #0f172a)",
+                    }}
+                  />
+                  <div style={{ padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                      <div>
+                        <span style={{ color: "#4ade80", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
+                          🧤 Paredão do Mês
+                        </span>
+                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.goleiro}</strong>
+                        <small style={{ color: "#94a3b8", display: "block", marginTop: "4px" }}>
+                          {item.jogos_goleiro} jogos realizados
+                        </small>
+                      </div>
+
+                      <div style={{ textShadow: "none", textAlign: "right", background: "rgba(74, 222, 128, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
+                        <strong style={{ color: "#4ade80", fontSize: "1.3rem", display: "block" }}>
+                          -{item.gols_sofridos_goleiro}
+                        </strong>
+                        <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
+                          {item.gols_sofridos_goleiro === 1 ? "gol sofrido" : "gols sofridos"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isAdmin && item.id !== 0 && (
+                      <SeletorFoto
+                        item={item}
+                        coluna="foto_goleiro"
+                        rotulo="Paredão"
+                        uploadEmAndamento={uploadEmAndamento}
+                        enviarFoto={enviarFoto}
+                        removerFoto={removerFoto}
+                        url={item.foto_goleiro_url}
+                      />
+                    )}
                   </div>
                 </div>
 
