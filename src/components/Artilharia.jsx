@@ -1,5 +1,9 @@
 import { escudoTime } from "../escudos";
-
+function capitalizarNome(nome = "") {
+  return nome
+    .toLowerCase()
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
 function Artilharia({ artilheiros }) {
   return (
     <article className="artilharia-painel">
@@ -37,9 +41,9 @@ function Artilharia({ artilheiros }) {
                 />
 
                 <div className="artilharia-info">
-                  <strong title={jogador.nome}>
-                    {jogador.nome}
-                  </strong>
+                  <strong title={capitalizarNome(jogador.nome)}>
+  {capitalizarNome(jogador.nome)}
+</strong>
 
                   <span title={jogador.time}>
                     {jogador.time}
