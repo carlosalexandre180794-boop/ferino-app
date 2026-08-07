@@ -43,12 +43,20 @@ function Home() {
 
           supabase
             .from("jogadores")
-            .select("nome, gols, times(nome)")
-            .eq("goleiro", false)
-            .gt("gols", 0)
-            .order("gols", { ascending: false })
-            .order("nome", { ascending: true })
-            .limit(1),
+            .select(`
+              id,
+              nome,
+              gols,
+              goleiro,
+              time_id,
+              times (
+                nome,
+                pontos,
+                saldo,
+                gols_pro
+              )
+            `)
+            .gt("gols", 0),
 
           supabase
             .from("jogadores")
@@ -78,6 +86,24 @@ function Home() {
 
         const times = resTimes.data || [];
         const partidas = resPartidas.data || [];
+
+        const artilheirosOrdenados = (resArtilheiros.data || [])
+          .map((jogador) => ({
+            ...jogador,
+            gols: Number(jogador.gols || 0),
+            pontosTime: Number(jogador.times?.pontos || 0),
+            saldoTime: Number(jogador.times?.saldo || 0),
+            golsProTime: Number(jogador.times?.gols_pro || 0),
+          }))
+          .filter((jogador) => jogador.gols > 0)
+          .sort(
+            (a, b) =>
+              b.gols - a.gols ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
+              a.nome.localeCompare(b.nome, "pt-BR")
+          );
 
         const goleirosOrdenados = (resGoleiros.data || [])
           .map((goleiro) => ({
@@ -119,7 +145,7 @@ function Home() {
           vice: times[1] || null,
           lanterna:
             times.length > 0 ? times[times.length - 1] : null,
-          artilheiro: resArtilheiros.data?.[0] || null,
+          artilheiro: artilheirosOrdenados[0] || null,
           melhorGoleiro: goleirosOrdenados[0] || null,
           jogosEncerrados: quantidadeJogos,
           totalGols: somaGols,
