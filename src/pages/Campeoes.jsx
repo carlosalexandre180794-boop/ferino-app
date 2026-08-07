@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
+function capitalizarNome(nome = "") {
+  return String(nome ?? "")
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, separador, letra) =>
+        separador + letra.toLocaleUpperCase("pt-BR")
+    );
+}
+
 const LISTA_MESES = [
   { id: 1, nome: "Janeiro" }, { id: 2, nome: "Fevereiro" }, { id: 3, nome: "Março" },
   { id: 4, nome: "Abril" }, { id: 5, nome: "Maio" }, { id: 6, nome: "Junho" },
@@ -40,12 +51,31 @@ foto_goleiro,
           vice:vice_time_id ( id, nome ),
           terceiro:terceiro_time_id ( id, nome ),
           artilheiro_id:artilheiro_jogador_id,
-          goleiro_id:goleiro_jogador_id
+          goleiro_id:goleiro_jogador_id,
+          artilheiro_nome,
+          gols_artilheiro,
+          goleiro_nome,
+          jogos_goleiro,
+          gols_sofridos_goleiro
         `)
         .eq("mes", mesSelecionado)
         .eq("ano", anoSelecionado);
 
       if (erroCampeoes) throw erroCampeoes;
+
+      const { data: temporadaSelecionada, error: erroTemporada } =
+        await supabase
+          .from("temporadas")
+          .select("id, status")
+          .eq("ano", anoSelecionado)
+          .eq("mes", mesSelecionado)
+          .maybeSingle();
+
+      if (erroTemporada) throw erroTemporada;
+
+      const campeonatoEncerrado =
+        String(temporadaSelecionada?.status || "").toLowerCase() ===
+        "encerrada";
 
       if (!dadosCampeoes || dadosCampeoes.length === 0) {
         setHistorico([]);
@@ -57,51 +87,153 @@ foto_goleiro,
 
       let golsArtilheiro = 0;
       let nomeArtilheiro = "Não informado";
-
-      if (item.artilheiro_id) {
-        const [
-          { data: jogador, error: erroJogador },
-          { data: golsDoJogador, error: erroGols },
-        ] = await Promise.all([
-          supabase
-           .from("jogadores")
-.select("nome, gols")
-            .eq("id", item.artilheiro_id)
-            .single(),
-
-          supabase
-            .from("gols_partida")
-            .select(`
-              quantidade,
-              partida:partida_id (
-                data_jogo
-              )
-            `)
-            .eq("jogador_id", item.artilheiro_id),
-        ]);
-
-        if (erroJogador) throw erroJogador;
-        if (erroGols) throw erroGols;
-
-        nomeArtilheiro = jogador?.nome || "Não informado";
-        golsArtilheiro = Number(jogador?.gols || 0);
-      }
+      let artilheiroIdAtual = item.artilheiro_id || null;
 
       let golsSofridosGoleiro = 0;
       let jogosGoleiro = 0;
       let nomeGoleiro = "Não informado";
+      let goleiroIdAtual = item.goleiro_id || null;
 
-      if (item.goleiro_id) {
-        const { data: g } = await supabase
-          .from("jogadores")
-          .select("nome, gols_sofridos, jogos_goleiro")
-          .eq("id", item.goleiro_id)
-          .single();
-          
-        if (g) {
-          nomeGoleiro = g.nome;
-          golsSofridosGoleiro = Number(g.gols_sofridos || 0);
-          jogosGoleiro = Number(g.jogos_goleiro || 0);
+      if (!campeonatoEncerrado) {
+        const [
+          { data: jogadoresAtuais, error: erroJogadoresAtuais },
+          { data: goleirosAtuais, error: erroGoleirosAtuais },
+        ] = await Promise.all([
+          supabase
+            .from("jogadores")
+            .select(`
+              id,
+              nome,
+              gols,
+              times (
+                nome,
+                pontos,
+                saldo,
+                gols_pro
+              )
+            `)
+            .gt("gols", 0),
+
+          supabase
+            .from("jogadores")
+            .select(`
+              id,
+              nome,
+              jogos_goleiro,
+              gols_sofridos,
+              times (
+                nome,
+                pontos,
+                saldo,
+                gols_pro
+              )
+            `)
+            .gt("jogos_goleiro", 0),
+        ]);
+
+        if (erroJogadoresAtuais) throw erroJogadoresAtuais;
+        if (erroGoleirosAtuais) throw erroGoleirosAtuais;
+
+        const artilheirosOrdenados = (jogadoresAtuais || [])
+          .map((jogador) => ({
+            ...jogador,
+            gols: Number(jogador.gols || 0),
+            pontosTime: Number(jogador.times?.pontos || 0),
+            saldoTime: Number(jogador.times?.saldo || 0),
+            golsProTime: Number(jogador.times?.gols_pro || 0),
+          }))
+          .sort(
+            (a, b) =>
+              b.gols - a.gols ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
+              a.nome.localeCompare(b.nome, "pt-BR")
+          );
+
+        const goleirosOrdenados = (goleirosAtuais || [])
+          .map((goleiro) => ({
+            ...goleiro,
+            jogos_goleiro: Number(goleiro.jogos_goleiro || 0),
+            gols_sofridos: Number(goleiro.gols_sofridos || 0),
+            pontosTime: Number(goleiro.times?.pontos || 0),
+            saldoTime: Number(goleiro.times?.saldo || 0),
+            golsProTime: Number(goleiro.times?.gols_pro || 0),
+          }))
+          .sort((a, b) => {
+            const mediaA =
+              a.jogos_goleiro > 0
+                ? a.gols_sofridos / a.jogos_goleiro
+                : Number.POSITIVE_INFINITY;
+
+            const mediaB =
+              b.jogos_goleiro > 0
+                ? b.gols_sofridos / b.jogos_goleiro
+                : Number.POSITIVE_INFINITY;
+
+            return (
+              mediaA - mediaB ||
+              a.gols_sofridos - b.gols_sofridos ||
+              b.jogos_goleiro - a.jogos_goleiro ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
+              a.nome.localeCompare(b.nome, "pt-BR")
+            );
+          });
+
+        const artilheiroAtual = artilheirosOrdenados[0] || null;
+        const goleiroAtual = goleirosOrdenados[0] || null;
+
+        if (artilheiroAtual) {
+          artilheiroIdAtual = artilheiroAtual.id;
+          nomeArtilheiro = artilheiroAtual.nome;
+          golsArtilheiro = artilheiroAtual.gols;
+        }
+
+        if (goleiroAtual) {
+          goleiroIdAtual = goleiroAtual.id;
+          nomeGoleiro = goleiroAtual.nome;
+          golsSofridosGoleiro = goleiroAtual.gols_sofridos;
+          jogosGoleiro = goleiroAtual.jogos_goleiro;
+        }
+      } else {
+        if (item.artilheiro_id) {
+          const { data: jogador, error: erroJogador } = await supabase
+            .from("jogadores")
+            .select("nome")
+            .eq("id", item.artilheiro_id)
+            .single();
+
+          if (erroJogador) throw erroJogador;
+
+          nomeArtilheiro =
+            item.artilheiro_nome ||
+            jogador?.nome ||
+            "Não informado";
+
+          golsArtilheiro = Number(item.gols_artilheiro || 0);
+        }
+
+        if (item.goleiro_id) {
+          const { data: goleiro, error: erroGoleiro } = await supabase
+            .from("jogadores")
+            .select("nome")
+            .eq("id", item.goleiro_id)
+            .single();
+
+          if (erroGoleiro) throw erroGoleiro;
+
+          nomeGoleiro =
+            item.goleiro_nome ||
+            goleiro?.nome ||
+            "Não informado";
+
+          golsSofridosGoleiro = Number(
+            item.gols_sofridos_goleiro || 0
+          );
+
+          jogosGoleiro = Number(item.jogos_goleiro || 0);
         }
       }
 
@@ -448,7 +580,9 @@ foto_goleiro_url: null,
                         <span style={{ color: "#38bdf8", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
                           ⚽ Artilheiro do Mês
                         </span>
-                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.artilheiro}</strong>
+                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>
+                          {capitalizarNome(item.artilheiro)}
+                        </strong>
                       </div>
 
                       <div style={{ textShadow: "none", textAlign: "right", background: "rgba(56, 189, 248, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
@@ -490,7 +624,9 @@ foto_goleiro_url: null,
                         <span style={{ color: "#4ade80", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
                           🧤 Paredão do Mês
                         </span>
-                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.goleiro}</strong>
+                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>
+                          {capitalizarNome(item.goleiro)}
+                        </strong>
                         <small style={{ color: "#94a3b8", display: "block", marginTop: "4px" }}>
                           {item.jogos_goleiro} jogos realizados
                         </small>
