@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
+
 function capitalizarNome(nome = "") {
   return String(nome ?? "")
     .trim()
@@ -19,6 +20,77 @@ const LISTA_MESES = [
   { id: 10, nome: "Outubro" }, { id: 11, nome: "Novembro" }, { id: 12, nome: "Dezembro" }
 ];
 
+
+function jogoEstaEncerrado(jogo) {
+  const status = String(jogo.status || "").toLowerCase();
+
+  return (
+    status === "encerrado" ||
+    status === "encerrada" ||
+    status === "finalizado" ||
+    status === "finalizada" ||
+    jogo.partida_id !== null
+  );
+}
+
+function calcularClassificacaoAtual(times, jogos) {
+  const mapa = new Map();
+
+  (times || []).forEach((time) => {
+    mapa.set(Number(time.id), {
+      id: Number(time.id),
+      nome: time.nome,
+      pontos: 0,
+      vitorias: 0,
+      golsPro: 0,
+      golsContra: 0,
+      saldo: 0,
+    });
+  });
+
+  (jogos || [])
+    .filter(jogoEstaEncerrado)
+    .forEach((jogo) => {
+      const timeA = mapa.get(Number(jogo.time_a_id));
+      const timeB = mapa.get(Number(jogo.time_b_id));
+
+      if (!timeA || !timeB) return;
+
+      const golsA = Number(jogo.gols_a ?? 0);
+      const golsB = Number(jogo.gols_b ?? 0);
+
+      timeA.golsPro += golsA;
+      timeA.golsContra += golsB;
+      timeB.golsPro += golsB;
+      timeB.golsContra += golsA;
+
+      if (golsA > golsB) {
+        timeA.pontos += 3;
+        timeA.vitorias += 1;
+      } else if (golsB > golsA) {
+        timeB.pontos += 3;
+        timeB.vitorias += 1;
+      } else {
+        timeA.pontos += 1;
+        timeB.pontos += 1;
+      }
+    });
+
+  const lista = Array.from(mapa.values()).map((time) => ({
+    ...time,
+    saldo: time.golsPro - time.golsContra,
+  }));
+
+  return lista.sort(
+    (a, b) =>
+      b.pontos - a.pontos ||
+      b.vitorias - a.vitorias ||
+      b.saldo - a.saldo ||
+      b.golsPro - a.golsPro ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
+}
+
 function Campeoes() {
   const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -27,6 +99,7 @@ function Campeoes() {
   const [uploadEmAndamento, setUploadEmAndamento] = useState(null);
   const [mensagem, setMensagem] = useState("");
   const [tipoMensagem, setTipoMensagem] = useState("sucesso");
+  const [fotoAmpliada, setFotoAmpliada] = useState(null);
 
   const [mesSelecionado, setMesSelecionado] = useState(new Date().getMonth() + 1);
   const [anoSelecionado] = useState(2026);
@@ -43,20 +116,20 @@ function Campeoes() {
           mes,
           ano,
           foto_campeao,
-foto_vice,
-foto_terceiro,
-foto_artilheiro,
-foto_goleiro,
-          campeao:campeao_time_id ( id, nome ),
-          vice:vice_time_id ( id, nome ),
-          terceiro:terceiro_time_id ( id, nome ),
-          artilheiro_id:artilheiro_jogador_id,
-          goleiro_id:goleiro_jogador_id,
+          foto_vice,
+          foto_terceiro,
+          foto_artilheiro,
+          foto_goleiro,
           artilheiro_nome,
           gols_artilheiro,
           goleiro_nome,
           jogos_goleiro,
-          gols_sofridos_goleiro
+          gols_sofridos_goleiro,
+          campeao:campeao_time_id ( id, nome ),
+          vice:vice_time_id ( id, nome ),
+          terceiro:terceiro_time_id ( id, nome ),
+          artilheiro_id:artilheiro_jogador_id,
+          goleiro_id:goleiro_jogador_id
         `)
         .eq("mes", mesSelecionado)
         .eq("ano", anoSelecionado);
@@ -79,181 +152,179 @@ foto_goleiro,
 
       if (!dadosCampeoes || dadosCampeoes.length === 0) {
         setHistorico([]);
-        setCarregando(false);
         return;
       }
 
       const item = dadosCampeoes[0];
 
-      let golsArtilheiro = 0;
-      let nomeArtilheiro = "Não informado";
-      let artilheiroIdAtual = item.artilheiro_id || null;
+      let campeaoAtual =
+        item.campeao?.nome || "Não informado";
+      let viceAtual =
+        item.vice?.nome || "Não informado";
+      let terceiroAtual =
+        item.terceiro?.nome || "Não informado";
 
+      let nomeArtilheiro = "Não informado";
+      let golsArtilheiro = 0;
+
+      let nomeGoleiro = "Não informado";
       let golsSofridosGoleiro = 0;
       let jogosGoleiro = 0;
-      let nomeGoleiro = "Não informado";
-      let goleiroIdAtual = item.goleiro_id || null;
 
       if (!campeonatoEncerrado) {
         const [
+          { data: timesAtuais, error: erroTimesAtuais },
+          { data: jogosAtuais, error: erroJogosAtuais },
           { data: jogadoresAtuais, error: erroJogadoresAtuais },
-          { data: goleirosAtuais, error: erroGoleirosAtuais },
         ] = await Promise.all([
+          supabase
+            .from("times")
+            .select("id, nome"),
+
+          supabase
+            .from("jogos_campeonato")
+            .select(
+              "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
+            )
+            .eq("temporada", anoSelecionado)
+            .eq("mes", mesSelecionado),
+
           supabase
             .from("jogadores")
             .select(`
               id,
               nome,
               gols,
-              times (
-                nome,
-                pontos,
-                saldo,
-                gols_pro
-              )
-            `)
-            .gt("gols", 0),
-
-          supabase
-            .from("jogadores")
-            .select(`
-              id,
-              nome,
               jogos_goleiro,
               gols_sofridos,
+              time_id,
               times (
-                nome,
-                pontos,
-                saldo,
-                gols_pro
+                nome
               )
             `)
-            .gt("jogos_goleiro", 0),
+            .eq("ativo", true),
         ]);
 
+        if (erroTimesAtuais) throw erroTimesAtuais;
+        if (erroJogosAtuais) throw erroJogosAtuais;
         if (erroJogadoresAtuais) throw erroJogadoresAtuais;
-        if (erroGoleirosAtuais) throw erroGoleirosAtuais;
+
+        const classificacaoAtual =
+          calcularClassificacaoAtual(
+            timesAtuais || [],
+            jogosAtuais || []
+          );
+
+        const jogosEncerrados =
+          (jogosAtuais || []).filter(jogoEstaEncerrado);
+
+        if (jogosEncerrados.length > 0) {
+          campeaoAtual =
+            classificacaoAtual[0]?.nome || campeaoAtual;
+          viceAtual =
+            classificacaoAtual[1]?.nome || viceAtual;
+          terceiroAtual =
+            classificacaoAtual[2]?.nome || terceiroAtual;
+        }
+
+        const posicaoPorTime = new Map(
+          classificacaoAtual.map((time, indice) => [
+            Number(time.id),
+            indice + 1,
+          ])
+        );
 
         const artilheirosOrdenados = (jogadoresAtuais || [])
+          .filter((jogador) => Number(jogador.gols || 0) > 0)
           .map((jogador) => ({
-            ...jogador,
+            id: Number(jogador.id),
+            nome: jogador.nome || "Não informado",
             gols: Number(jogador.gols || 0),
-            pontosTime: Number(jogador.times?.pontos || 0),
-            saldoTime: Number(jogador.times?.saldo || 0),
-            golsProTime: Number(jogador.times?.gols_pro || 0),
+            timeId: Number(jogador.time_id),
+            posicaoTime:
+              posicaoPorTime.get(Number(jogador.time_id)) ??
+              Number.POSITIVE_INFINITY,
           }))
           .sort(
             (a, b) =>
               b.gols - a.gols ||
-              b.pontosTime - a.pontosTime ||
-              b.saldoTime - a.saldoTime ||
-              b.golsProTime - a.golsProTime ||
+              a.posicaoTime - b.posicaoTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
           );
 
-        const goleirosOrdenados = (goleirosAtuais || [])
-          .map((goleiro) => ({
-            ...goleiro,
-            jogos_goleiro: Number(goleiro.jogos_goleiro || 0),
-            gols_sofridos: Number(goleiro.gols_sofridos || 0),
-            pontosTime: Number(goleiro.times?.pontos || 0),
-            saldoTime: Number(goleiro.times?.saldo || 0),
-            golsProTime: Number(goleiro.times?.gols_pro || 0),
-          }))
-          .sort((a, b) => {
-            const mediaA =
-              a.jogos_goleiro > 0
-                ? a.gols_sofridos / a.jogos_goleiro
-                : Number.POSITIVE_INFINITY;
+        const goleirosOrdenados = (jogadoresAtuais || [])
+          .filter(
+            (jogador) =>
+              Number(jogador.jogos_goleiro || 0) > 0
+          )
+          .map((jogador) => {
+            const jogos = Number(jogador.jogos_goleiro || 0);
+            const sofridos = Number(jogador.gols_sofridos || 0);
 
-            const mediaB =
-              b.jogos_goleiro > 0
-                ? b.gols_sofridos / b.jogos_goleiro
-                : Number.POSITIVE_INFINITY;
-
-            return (
-              mediaA - mediaB ||
-              a.gols_sofridos - b.gols_sofridos ||
-              b.jogos_goleiro - a.jogos_goleiro ||
-              b.pontosTime - a.pontosTime ||
-              b.saldoTime - a.saldoTime ||
-              b.golsProTime - a.golsProTime ||
+            return {
+              id: Number(jogador.id),
+              nome: jogador.nome || "Não informado",
+              jogos,
+              sofridos,
+              media:
+                jogos > 0
+                  ? sofridos / jogos
+                  : Number.POSITIVE_INFINITY,
+              timeId: Number(jogador.time_id),
+              posicaoTime:
+                posicaoPorTime.get(Number(jogador.time_id)) ??
+                Number.POSITIVE_INFINITY,
+            };
+          })
+          .sort(
+            (a, b) =>
+              a.media - b.media ||
+              a.sofridos - b.sofridos ||
+              b.jogos - a.jogos ||
+              a.posicaoTime - b.posicaoTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
-            );
-          });
+          );
 
         const artilheiroAtual = artilheirosOrdenados[0] || null;
         const goleiroAtual = goleirosOrdenados[0] || null;
 
         if (artilheiroAtual) {
-          artilheiroIdAtual = artilheiroAtual.id;
-          nomeArtilheiro = artilheiroAtual.nome;
+          nomeArtilheiro = capitalizarNome(artilheiroAtual.nome);
           golsArtilheiro = artilheiroAtual.gols;
         }
 
         if (goleiroAtual) {
-          goleiroIdAtual = goleiroAtual.id;
-          nomeGoleiro = goleiroAtual.nome;
-          golsSofridosGoleiro = goleiroAtual.gols_sofridos;
-          jogosGoleiro = goleiroAtual.jogos_goleiro;
+          nomeGoleiro = capitalizarNome(goleiroAtual.nome);
+          golsSofridosGoleiro = goleiroAtual.sofridos;
+          jogosGoleiro = goleiroAtual.jogos;
         }
       } else {
-        if (item.artilheiro_id) {
-          const { data: jogador, error: erroJogador } = await supabase
-            .from("jogadores")
-            .select("nome")
-            .eq("id", item.artilheiro_id)
-            .single();
+        // CORREÇÃO: Lê os snapshots textuais e numéricos que gravamos de forma permanente
+        nomeArtilheiro = capitalizarNome(item.artilheiro_nome || "Não informado");
+        golsArtilheiro = Number(item.gols_artilheiro || 0);
 
-          if (erroJogador) throw erroJogador;
-
-          nomeArtilheiro =
-            item.artilheiro_nome ||
-            jogador?.nome ||
-            "Não informado";
-
-          golsArtilheiro = Number(item.gols_artilheiro || 0);
-        }
-
-        if (item.goleiro_id) {
-          const { data: goleiro, error: erroGoleiro } = await supabase
-            .from("jogadores")
-            .select("nome")
-            .eq("id", item.goleiro_id)
-            .single();
-
-          if (erroGoleiro) throw erroGoleiro;
-
-          nomeGoleiro =
-            item.goleiro_nome ||
-            goleiro?.nome ||
-            "Não informado";
-
-          golsSofridosGoleiro = Number(
-            item.gols_sofridos_goleiro || 0
-          );
-
-          jogosGoleiro = Number(item.jogos_goleiro || 0);
-        }
+        nomeGoleiro = capitalizarNome(item.goleiro_nome || "Não informado");
+        golsSofridosGoleiro = Number(item.gols_sofridos_goleiro || 0);
+        jogosGoleiro = Number(item.jogos_goleiro || 0);
       }
 
       const dadosFormatados = [{
         id: item.id,
         mes: item.mes,
         ano: item.ano,
-        campeao: item.campeao?.nome || "Não informado",
-        vice: item.vice?.nome || "Não informado",
-        terceiro: item.terceiro?.nome || "Não informado",
+        campeao: campeaoAtual,
+        vice: viceAtual,
+        terceiro: terceiroAtual,
         artilheiro: nomeArtilheiro,
         gols_artilheiro: golsArtilheiro,
         goleiro: nomeGoleiro,
         gols_sofridos_goleiro: golsSofridosGoleiro,
         jogos_goleiro: jogosGoleiro,
         foto_campeao_url: item.foto_campeao,
-foto_vice_url: item.foto_vice,
-foto_terceiro_url: item.foto_terceiro,
-foto_artilheiro_url: item.foto_artilheiro,
-foto_goleiro_url: item.foto_goleiro,
+        foto_vice_url: item.foto_vice,
+        foto_terceiro_url: item.foto_terceiro,
+        foto_artilheiro_url: item.foto_artilheiro,
+        foto_goleiro_url: item.foto_goleiro
       }];
 
       setHistorico(dadosFormatados);
@@ -270,6 +341,7 @@ foto_goleiro_url: item.foto_goleiro,
   useEffect(() => {
     carregarHistorico();
   }, [mesSelecionado, anoSelecionado]);
+
   function verificarSenhaAdmin(evento) {
     evento.preventDefault();
     if (senhaDigitada === "ferino2026") {
@@ -304,7 +376,7 @@ foto_goleiro_url: item.foto_goleiro,
       return;
     }
 
-    const chaveUpload = `${item.id}_${colunaFoto}`;
+     const chaveUpload = `${item.id}_${colunaFoto}`;
     setUploadEmAndamento(chaveUpload);
     setMensagem("");
 
@@ -384,30 +456,6 @@ foto_goleiro_url: item.foto_goleiro,
     }
   }
 
-  const dadosExibidos =
-    historico.length > 0
-      ? historico
-      : [
-          {
-            id: 0,
-            mes: mesSelecionado,
-            ano: anoSelecionado,
-            campeao: "Aguardando definição",
-            vice: "Aguardando definição",
-            terceiro: "Aguardando definição",
-            artilheiro: "Sem registro",
-            gols_artilheiro: 0,
-            goleiro: "Sem registro",
-            gols_sofridos_goleiro: 0,
-            jogos_goleiro: 0,
-            foto_campeao_url: null,
-foto_vice_url: null,
-foto_terceiro_url: null,
-foto_artilheiro_url: null,
-foto_goleiro_url: null,
-          },
-        ];
-
   return (
     <main className="page">
       <section
@@ -477,6 +525,7 @@ foto_goleiro_url: null,
             Sair do modo administrador
           </button>
         )}
+
       </section>
 
       <section style={{ marginBottom: "24px", background: "#111827", padding: "16px", borderRadius: "10px", border: "1px solid #25324a" }}>
@@ -513,9 +562,16 @@ foto_goleiro_url: null,
 
       {carregando ? (
         <p style={{ textAlign: "center", color: "#fff" }}>Carregando galeria...</p>
+      ) : historico.length === 0 ? (
+        <section className="panel" style={{ textAlign: "center", padding: "32px" }}>
+          <h3 style={{ marginTop: 0 }}>Nenhum registro para este período</h3>
+          <p style={{ color: "#aaa" }}>
+            Não encontramos pódios ou destaques salvos para {formatarMesExtenso(mesSelecionado, anoSelecionado)}.
+          </p>
+        </section>
       ) : (
         <section style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {dadosExibidos.map((item) => (
+          {historico.map((item) => (
             <article
               key={item.id}
               style={{
@@ -536,124 +592,120 @@ foto_goleiro_url: null,
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "24px" }}>
                 
                 <div style={{ background: "#1e293b", border: "1px solid #eab308", borderRadius: "10px", overflow: "hidden" }}>
-                  <div style={{ height: "160px", background: item.foto_campeao_url ? `url("${item.foto_campeao_url}") center/cover` : "linear-gradient(to bottom, #3b2a0c, #1e293b)" }} />
+                  {item.foto_campeao_url && (
+                    <div
+                      onClick={() => setFotoAmpliada(item.foto_campeao_url)}
+                      title="Clique para ampliar"
+                      style={{
+                        height: "320px",
+                        background: `url("${item.foto_campeao_url}") center/contain no-repeat`,
+                        backgroundColor: "#3b2a0c",
+                        cursor: "zoom-in"
+                      }}
+                    />
+                  )}
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#eab308", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🏆 1º LUGAR (CAMPEÃO)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.campeao}</h4>
-                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
                   </div>
                 </div>
 
                 <div style={{ background: "#1e293b", border: "1px solid #94a3b8", borderRadius: "10px", overflow: "hidden" }}>
-                  <div style={{ height: "160px", background: item.foto_vice_url ? `url("${item.foto_vice_url}") center/cover` : "linear-gradient(to bottom, #27303f, #1e293b)" }} />
+                  {item.foto_vice_url && (
+                    <div
+                      onClick={() => setFotoAmpliada(item.foto_vice_url)}
+                      title="Clique para ampliar"
+                      style={{
+                        height: "320px",
+                        background: `url("${item.foto_vice_url}") center/contain no-repeat`,
+                        backgroundColor: "#27303f",
+                        cursor: "zoom-in"
+                      }}
+                    />
+                  )}
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#94a3b8", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥈 2º LUGAR (VICE)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.vice}</h4>
-                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
                   </div>
                 </div>
                 <div style={{ background: "#1e293b", border: "1px solid #cd7f32", borderRadius: "10px", overflow: "hidden" }}>
-                  <div style={{ height: "160px", background: item.foto_terceiro_url ? `url("${item.foto_terceiro_url}") center/cover` : "linear-gradient(to bottom, #33231a, #1e293b)" }} />
+                  {item.foto_terceiro_url && (
+                    <div
+                      onClick={() => setFotoAmpliada(item.foto_terceiro_url)}
+                      title="Clique para ampliar"
+                      style={{
+                        height: "320px",
+                        background: `url("${item.foto_terceiro_url}") center/contain no-repeat`,
+                        backgroundColor: "#33231a",
+                        cursor: "zoom-in"
+                      }}
+                    />
+                  )}
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#cd7f32", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥉 3º LUGAR</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.terceiro}</h4>
-                    {isAdmin && item.id !== 0 && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
                   </div>
                 </div>
 
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginTop: "10px" }}>
-                
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginTop: "10px" }}>
+
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
                   <div
+                    onClick={() => item.foto_artilheiro_url && setFotoAmpliada(item.foto_artilheiro_url)}
+                    title={item.foto_artilheiro_url ? "Clique para ampliar" : undefined}
                     style={{
-                      height: "220px",
+                      height: "320px",
                       background: item.foto_artilheiro_url
-                        ? `url("${item.foto_artilheiro_url}") center/cover`
-                        : "linear-gradient(to bottom, rgba(14, 77, 120, 0.55), #0f172a)",
+                        ? `url("${item.foto_artilheiro_url}") center/contain no-repeat`
+                        : "linear-gradient(to bottom, #0c2740, #0f172a)",
+                      backgroundColor: "#0f172a",
+                      cursor: item.foto_artilheiro_url ? "zoom-in" : "default",
                     }}
                   />
-                  <div style={{ padding: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-                      <div>
-                        <span style={{ color: "#38bdf8", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-                          ⚽ Artilheiro do Mês
-                        </span>
-                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>
-                          {capitalizarNome(item.artilheiro)}
-                        </strong>
-                      </div>
-
-                      <div style={{ textShadow: "none", textAlign: "right", background: "rgba(56, 189, 248, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
-                        <strong style={{ color: "#38bdf8", fontSize: "1.3rem", display: "block" }}>
-                          {item.gols_artilheiro}
-                        </strong>
-                        <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                          {item.gols_artilheiro === 1 ? "gol" : "gols"}
-                        </span>
-                      </div>
+                  <div style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                    <div>
+                      <span style={{ color: "#38bdf8", fontWeight: "bold", display: "block", marginBottom: "6px" }}>⚽ Artilheiro do Mês</span>
+                      <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.artilheiro}</strong>
                     </div>
-
-                    {isAdmin && item.id !== 0 && (
-                      <SeletorFoto
-                        item={item}
-                        coluna="foto_artilheiro"
-                        rotulo="Artilheiro"
-                        uploadEmAndamento={uploadEmAndamento}
-                        enviarFoto={enviarFoto}
-                        removerFoto={removerFoto}
-                        url={item.foto_artilheiro_url}
-                      />
-                    )}
+                    <div style={{ textShadow: "none", textAlign: "right", background: "rgba(56, 189, 248, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
+                      <strong style={{ color: "#38bdf8", fontSize: "1.3rem", display: "block" }}>{item.gols_artilheiro}</strong>
+                      <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>{item.gols_artilheiro === 1 ? "gol" : "gols"}</span>
+                    </div>
                   </div>
+
+                           {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_artilheiro" rotulo="Artilheiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_artilheiro_url} /></div>}
                 </div>
 
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
                   <div
+                    onClick={() => item.foto_goleiro_url && setFotoAmpliada(item.foto_goleiro_url)}
+                    title={item.foto_goleiro_url ? "Clique para ampliar" : undefined}
                     style={{
-                      height: "220px",
+                      height: "320px",
                       background: item.foto_goleiro_url
-                        ? `url("${item.foto_goleiro_url}") center/cover`
-                        : "linear-gradient(to bottom, rgba(22, 101, 52, 0.55), #0f172a)",
+                        ? `url("${item.foto_goleiro_url}") center/contain no-repeat`
+                        : "linear-gradient(to bottom, #14281d, #0f172a)",
+                      backgroundColor: "#0f172a",
+                      cursor: item.foto_goleiro_url ? "zoom-in" : "default",
                     }}
                   />
-                  <div style={{ padding: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-                      <div>
-                        <span style={{ color: "#4ade80", fontWeight: "bold", display: "block", marginBottom: "6px" }}>
-                          🧤 Paredão do Mês
-                        </span>
-                        <strong style={{ color: "#fff", fontSize: "1.2rem" }}>
-                          {capitalizarNome(item.goleiro)}
-                        </strong>
-                        <small style={{ color: "#94a3b8", display: "block", marginTop: "4px" }}>
-                          {item.jogos_goleiro} jogos realizados
-                        </small>
-                      </div>
-
-                      <div style={{ textShadow: "none", textAlign: "right", background: "rgba(74, 222, 128, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
-                        <strong style={{ color: "#4ade80", fontSize: "1.3rem", display: "block" }}>
-                          -{item.gols_sofridos_goleiro}
-                        </strong>
-                        <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                          {item.gols_sofridos_goleiro === 1 ? "gol sofrido" : "gols sofridos"}
-                        </span>
-                      </div>
+                  <div style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                    <div>
+                      <span style={{ color: "#22c55e", fontWeight: "bold", display: "block", marginBottom: "6px" }}>🧤 Paredão do Mês</span>
+                      <strong style={{ color: "#fff", fontSize: "1.2rem" }}>{item.goleiro}</strong>
+                      <span style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginTop: "2px" }}>{item.jogos_goleiro || 0} jogos realizados</span>
                     </div>
-
-                    {isAdmin && item.id !== 0 && (
-                      <SeletorFoto
-                        item={item}
-                        coluna="foto_goleiro"
-                        rotulo="Paredão"
-                        uploadEmAndamento={uploadEmAndamento}
-                        enviarFoto={enviarFoto}
-                        removerFoto={removerFoto}
-                        url={item.foto_goleiro_url}
-                      />
-                    )}
+                    <div style={{ textShadow: "none", textAlign: "right", background: "rgba(34, 197, 94, 0.1)", padding: "8px 12px", borderRadius: "6px" }}>
+                      <strong style={{ color: "#22c55e", fontSize: "1.3rem", display: "block" }}>{item.gols_sofridos_goleiro}</strong>
+                      <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>sofridos</span>
+                    </div>
                   </div>
+                  {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_goleiro" rotulo="Melhor Goleiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_goleiro_url} /></div>}
                 </div>
 
               </div>
@@ -661,6 +713,44 @@ foto_goleiro_url: null,
           ))}
         </section>
       )}
+
+      {fotoAmpliada && (
+        <div
+          onClick={() => setFotoAmpliada(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+            cursor: "zoom-out",
+            padding: "20px"
+          }}
+        >
+          <img
+            src={fotoAmpliada}
+            alt="Foto ampliada"
+            onClick={(evento) => evento.stopPropagation()}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "calc(100vh - 40px)",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "10px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+              cursor: "default"
+            }}
+          />
+        </div>
+      )}
+
     </main>
   );
 }

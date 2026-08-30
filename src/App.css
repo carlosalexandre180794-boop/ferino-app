@@ -2421,3 +2421,16 @@ main,
   background: #3b82f6;
   color: #ffffff;
 }
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-shell main.page {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom)) !important;
+}
+
+@media (max-width: 700px) {
+  .app-shell main.page {
+    padding-bottom: calc(125px + env(safe-area-inset-bottom)) !important;
+  }
+}

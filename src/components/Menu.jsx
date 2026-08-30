@@ -55,6 +55,11 @@ const itensMais = [
     icon: "🔄",
   },
   {
+    to: "/troca-definitiva",
+    label: "Troca definitiva",
+    icon: "👥",
+  },
+  {
     to: "/campeonato",
     label: "Campeonato",
     icon: "⚙",

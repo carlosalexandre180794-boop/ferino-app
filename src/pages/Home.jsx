@@ -84,9 +84,18 @@ function Home() {
         if (resGoleiros.error) throw resGoleiros.error;
         if (resPartidas.error) throw resPartidas.error;
 
-        const times = resTimes.data || [];
-        const partidas = resPartidas.data || [];
-
+       const times = [...(resTimes.data || [])].sort(
+  (a, b) =>
+    Number(b.pontos || 0) - Number(a.pontos || 0) ||
+    Number(b.vitorias || 0) - Number(a.vitorias || 0) ||
+    Number(b.saldo || 0) - Number(a.saldo || 0) ||
+    Number(b.gols_pro || 0) - Number(a.gols_pro || 0) ||
+    String(a.nome || "").localeCompare(
+      String(b.nome || ""),
+      "pt-BR"
+    )
+);
+const partidas = resPartidas.data || [];
         const artilheirosOrdenados = (resArtilheiros.data || [])
           .map((jogador) => ({
             ...jogador,

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { escudoTime } from "../escudos";
 
 const CHAVE_POSICOES = "ferino_posicoes_classificacao";
+const CHAVE_MOVIMENTOS = "ferino_movimentos_classificacao";
+const CHAVE_ASSINATURA = "ferino_assinatura_classificacao";
 
 function numero(valor) {
   return Number(valor ?? 0);
@@ -13,7 +15,7 @@ function saldoFormatado(valor) {
 }
 
 function Tabela({ classificacao = [] }) {
-  const [posicoesAnteriores, setPosicoesAnteriores] = useState({});
+  const [movimentosSalvos, setMovimentosSalvos] = useState({});
 
   const posicoesAtuais = useMemo(() => {
     const mapa = {};
@@ -25,50 +27,153 @@ function Tabela({ classificacao = [] }) {
     return mapa;
   }, [classificacao]);
 
-  useEffect(() => {
-    try {
-      const salvo = localStorage.getItem(CHAVE_POSICOES);
+  const assinaturaAtual = useMemo(() => {
+    return JSON.stringify(
+      classificacao.map((item, index) => ({
+        chave: String(item.id ?? item.nome),
+        posicao: index + 1,
+        pontos: numero(item.pontos),
+        jogos: numero(
+          item.jogos ??
+            item.partidas_jogadas ??
+            item.pj
+        ),
+        vitorias: numero(item.vitorias ?? item.vit),
+        empates: numero(item.empates ?? item.e),
+        derrotas: numero(item.derrotas ?? item.der),
+        golsPro: numero(
+          item.gols_pro ??
+            item.gols_marcados ??
+            item.gm
+        ),
+        golsContra: numero(
+          item.gols_contra ??
+            item.gols_sofridos ??
+            item.gc
+        ),
+        saldo: numero(
+          item.saldo ??
+            item.saldo_gols ??
+            item.sg
+        ),
+      }))
+    );
+  }, [classificacao]);
 
-      if (salvo) {
-        setPosicoesAnteriores(JSON.parse(salvo));
+  useEffect(() => {
+    if (classificacao.length === 0) return;
+
+    try {
+      const posicoesSalvasTexto =
+        localStorage.getItem(CHAVE_POSICOES);
+
+      const movimentosSalvosTexto =
+        localStorage.getItem(CHAVE_MOVIMENTOS);
+
+      const assinaturaSalva =
+        localStorage.getItem(CHAVE_ASSINATURA);
+
+      const posicoesSalvas = posicoesSalvasTexto
+        ? JSON.parse(posicoesSalvasTexto)
+        : null;
+
+      const movimentosAnteriores = movimentosSalvosTexto
+        ? JSON.parse(movimentosSalvosTexto)
+        : {};
+
+      // Primeira vez: cria a referência, sem inventar subida ou descida.
+      if (!posicoesSalvas || !assinaturaSalva) {
+        localStorage.setItem(
+          CHAVE_POSICOES,
+          JSON.stringify(posicoesAtuais)
+        );
+
+        localStorage.setItem(
+          CHAVE_MOVIMENTOS,
+          JSON.stringify({})
+        );
+
+        localStorage.setItem(
+          CHAVE_ASSINATURA,
+          assinaturaAtual
+        );
+
+        setMovimentosSalvos({});
+        return;
       }
+
+      // Se nada mudou na classificação, mantém as setas da última atualização.
+      if (assinaturaSalva === assinaturaAtual) {
+        setMovimentosSalvos(movimentosAnteriores);
+        return;
+      }
+
+      // Houve uma nova atualização/rodada:
+      // compara a nova posição com a posição guardada anteriormente.
+      const novosMovimentos = {};
+
+      classificacao.forEach((item, index) => {
+        const chave = String(item.id ?? item.nome);
+        const posicaoAtual = index + 1;
+        const posicaoAnterior = Number(posicoesSalvas[chave]);
+
+        if (!posicaoAnterior || posicaoAnterior === posicaoAtual) {
+          novosMovimentos[chave] = "igual";
+        } else if (posicaoAtual < posicaoAnterior) {
+          novosMovimentos[chave] = "subiu";
+        } else {
+          novosMovimentos[chave] = "desceu";
+        }
+      });
+
+      setMovimentosSalvos(novosMovimentos);
+
+      localStorage.setItem(
+        CHAVE_MOVIMENTOS,
+        JSON.stringify(novosMovimentos)
+      );
 
       localStorage.setItem(
         CHAVE_POSICOES,
         JSON.stringify(posicoesAtuais)
       );
+
+      localStorage.setItem(
+        CHAVE_ASSINATURA,
+        assinaturaAtual
+      );
     } catch (erro) {
       console.error(
-        "Não foi possível guardar as posições anteriores:",
+        "Não foi possível guardar os movimentos da classificação:",
         erro
       );
     }
-  }, [posicoesAtuais]);
+  }, [assinaturaAtual, classificacao, posicoesAtuais]);
 
-  function movimento(item, posicaoAtual) {
+  function movimento(item) {
     const chave = String(item.id ?? item.nome);
-    const anterior = posicoesAnteriores[chave];
+    const movimentoSalvo = movimentosSalvos[chave];
 
-    if (!anterior || anterior === posicaoAtual) {
-      return {
-        simbolo: "–",
-        cor: "#94a3b8",
-        titulo: "Permaneceu na posição",
-      };
-    }
-
-    if (posicaoAtual < anterior) {
+    if (movimentoSalvo === "subiu") {
       return {
         simbolo: "▲",
         cor: "#22c55e",
-        titulo: "Subiu de posição",
+        titulo: "Subiu de posição na última atualização",
+      };
+    }
+
+    if (movimentoSalvo === "desceu") {
+      return {
+        simbolo: "▼",
+        cor: "#ef4444",
+        titulo: "Desceu de posição na última atualização",
       };
     }
 
     return {
-      simbolo: "▼",
-      cor: "#ef4444",
-      titulo: "Desceu de posição",
+      simbolo: "–",
+      cor: "#94a3b8",
+      titulo: "Permaneceu na posição na última atualização",
     };
   }
 
@@ -339,7 +444,7 @@ function Tabela({ classificacao = [] }) {
 
         {classificacao.map((item, index) => {
           const posicaoAtual = index + 1;
-          const indicador = movimento(item, posicaoAtual);
+          const indicador = movimento(item);
 
           const pontos = numero(item.pontos);
           const jogos = numero(

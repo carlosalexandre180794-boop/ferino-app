@@ -241,6 +241,16 @@ function Jogos() {
     );
   }
 
+  function primeiroJogoPendenteDaRodada(rodada) {
+    return [...(rodada.jogos || [])]
+      .filter((jogo) => !jogoFinalizado(jogo))
+      .sort(
+        (a, b) =>
+          Number(a.ordem_jogo || 0) -
+          Number(b.ordem_jogo || 0)
+      )[0] || null;
+  }
+
   function abrirPartida(jogo) {
     if (editandoOrdem) return;
 
@@ -278,131 +288,101 @@ function Jogos() {
     }
 
     navigate("/ficha-partida", {
-      state: {
-        jogo: {
-          id: jogo.id,
-          jogoCampeonatoId: jogo.id,
-          rodada: jogo.rodada,
-          ordemJogo: jogo.ordem_jogo,
-          dataJogo: jogo.data_jogo,
-          casa: timeCasa.nome,
-          fora: timeFora.nome,
-          timeAId: timeCasa.id,
-          timeBId: timeFora.id,
-          time_a_id: timeCasa.id,
-          time_b_id: timeFora.id,
-        },
-      },
+  state: {
+    jogo: {
+      id: jogo.id,
+      jogoCampeonatoId: jogo.id,
+
+      ano,
+      mes,
+
+      rodada: jogo.rodada,
+      ordemJogo: jogo.ordem_jogo,
+      dataJogo: jogo.data_jogo,
+
+      casa: timeCasa.nome,
+      fora: timeFora.nome,
+
+      timeAId: timeCasa.id,
+      timeBId: timeFora.id,
+      time_a_id: timeCasa.id,
+      time_b_id: timeFora.id,
+    },
+  },
+});
+  }
+
+ function reabrirJogo(jogo) {
+  if (editandoOrdem) return;
+
+  if (!adminEstaAtivo()) {
+    setAdminLiberado(false);
+
+    setAcaoPendente({
+      tipo: "reabrir",
+      jogo,
     });
-  }
 
-  async function reabrirJogo(jogo) {
-    if (editandoOrdem) return;
-
-    if (!adminEstaAtivo()) {
-      setAdminLiberado(false);
-      setAcaoPendente({
-        tipo: "reabrir",
-        jogo,
-      });
-      setMostrarLogin(true);
-      setTipoMensagem("erro");
-      setMensagem(
-        "Acesso restrito. Digite a senha de administrador para desfazer resultados."
-      );
-      return;
-    }
-
-    if (alterandoJogoId !== null) return;
-
-    if (!jogo.partida_id) {
-      setTipoMensagem("erro");
-      setMensagem(
-        "Este jogo não possui uma partida registrada para desfazer."
-      );
-      return;
-    }
-
-    const nomeCasa = nomeDoTime(jogo.time_a_id);
-    const nomeFora = nomeDoTime(jogo.time_b_id);
-
-    const confirmar = window.confirm(
-      `Deseja desfazer completamente o resultado de ${nomeCasa} x ${nomeFora}?\n\n` +
-        "A classificação, a artilharia e as estatísticas dos goleiros também serão atualizadas."
+    setMostrarLogin(true);
+    setTipoMensagem("erro");
+    setMensagem(
+      "Acesso restrito. Digite a senha de administrador para corrigir o resultado."
     );
-
-    if (!confirmar) return;
-
-    setAlterandoJogoId(jogo.id);
-    setMensagem("");
-
-    try {
-      const { error } = await supabase.rpc("desfazer_partida", {
-        p_partida_id: Number(jogo.partida_id),
-      });
-
-      if (error) {
-        throw new Error(
-          `Não foi possível desfazer a partida: ${error.message}`
-        );
-      }
-
-      const { error: erroRodada } = await supabase
-        .from("rodadas_campeonato")
-        .upsert(
-          {
-            temporada: ano,
-            mes,
-            rodada: Number(jogo.rodada),
-            status: "aberta",
-            encerrada_em: null,
-          },
-          {
-            onConflict: "temporada,mes,rodada",
-          }
-        );
-
-      if (erroRodada) {
-        throw new Error(
-          `O resultado foi desfeito, mas não foi possível reabrir a rodada: ${erroRodada.message}`
-        );
-      }
-
-      setJogos((jogosAtuais) =>
-        jogosAtuais.map((item) =>
-          Number(item.id) === Number(jogo.id)
-            ? {
-                ...item,
-                status: "pendente",
-                gols_a: null,
-                gols_b: null,
-                partida_id: null,
-              }
-            : item
-        )
-      );
-
-      setRodadasEncerradas((estadoAtual) => ({
-        ...estadoAtual,
-        [Number(jogo.rodada)]: false,
-      }));
-
-      setRodadaAberta(Number(jogo.rodada));
-
-      setTipoMensagem("sucesso");
-      setMensagem(
-        "✅ Resultado desfeito. Classificação, artilharia e goleiros foram atualizados."
-      );
-    } catch (erro) {
-      console.error("Erro ao desfazer partida:", erro);
-      setTipoMensagem("erro");
-      setMensagem(
-        erro.message || "Não foi possível desfazer a partida."
-      );
-    } finally {
-      setAlterandoJogoId(null);
-    }
+    return;
   }
+
+  if (!jogo.partida_id) {
+    setTipoMensagem("erro");
+    setMensagem(
+      "Este jogo não possui uma partida registrada para edição."
+    );
+    return;
+  }
+
+  const timeCasa = encontrarTimePorId(jogo.time_a_id);
+  const timeFora = encontrarTimePorId(jogo.time_b_id);
+
+  if (!timeCasa || !timeFora) {
+    setTipoMensagem("erro");
+    setMensagem(
+      "Não foi possível identificar os times desta partida."
+    );
+    return;
+  }
+
+  navigate("/ficha-partida", {
+    state: {
+      modoEdicao: true,
+
+      jogo: {
+        id: jogo.id,
+        jogoCampeonatoId: jogo.id,
+        partidaId: jogo.partida_id,
+        partida_id: jogo.partida_id,
+
+        ano,
+        mes,
+
+        rodada: jogo.rodada,
+        ordemJogo: jogo.ordem_jogo,
+        dataJogo: jogo.data_jogo,
+
+        casa: timeCasa.nome,
+        fora: timeFora.nome,
+
+        timeAId: timeCasa.id,
+        timeBId: timeFora.id,
+        time_a_id: timeCasa.id,
+        time_b_id: timeFora.id,
+
+        golsA: Number(jogo.gols_a ?? 0),
+        golsB: Number(jogo.gols_b ?? 0),
+        gols_a: Number(jogo.gols_a ?? 0),
+        gols_b: Number(jogo.gols_b ?? 0),
+      },
+    },
+  });
+}
 
   function solicitarEdicaoOrdem() {
     if (Number(rodadaAberta) !== 1) {
@@ -1054,6 +1034,15 @@ function Jogos() {
             jogosConcluidos === totalJogosRodada;
           const rodadaEncerrada =
             Boolean(rodadasEncerradas[rodada.numero]);
+
+          const primeiroPendente =
+            rodadaEncerrada || jogosConcluidos === 0
+              ? null
+              : primeiroJogoPendenteDaRodada(rodada);
+
+          const jogoEmAndamentoId =
+            primeiroPendente?.id ?? null;
+
           const percentual =
             totalJogosRodada > 0
               ? Math.round(
@@ -1123,6 +1112,9 @@ function Jogos() {
                       const nomeCasa = nomeDoTime(jogo.time_a_id);
                       const nomeFora = nomeDoTime(jogo.time_b_id);
                       const finalizado = jogoFinalizado(jogo);
+                      const emAndamento =
+                        !finalizado &&
+                        Number(jogo.id) === Number(jogoEmAndamentoId);
                       const alterando =
                         Number(alterandoJogoId) === Number(jogo.id);
 
@@ -1175,11 +1167,15 @@ function Jogos() {
                                   ? "#172033"
                                   : finalizado
                                   ? "#16352d"
+                                  : emAndamento
+                                  ? "#332b12"
                                   : "#1f2937",
                                 border: editandoOrdem
                                   ? "1px solid #3b82f6"
                                   : finalizado
                                   ? "1px solid #22c55e"
+                                  : emAndamento
+                                  ? "1px solid #f59e0b"
                                   : "1px solid rgba(148, 163, 184, 0.16)",
                                 borderRadius: "12px",
                                 cursor: editandoOrdem
@@ -1274,11 +1270,18 @@ function Jogos() {
                                     </strong>
                                     <span
                                       style={{
-                                        color: "#94a3b8",
+                                        color: emAndamento
+                                          ? "#fbbf24"
+                                          : "#94a3b8",
                                         fontSize: "12px",
+                                        fontWeight: emAndamento
+                                          ? "800"
+                                          : "400",
                                       }}
                                     >
-                                      Pendente
+                                      {emAndamento
+                                        ? "● Em andamento"
+                                        : "Pendente"}
                                     </span>
                                   </>
                                 )}

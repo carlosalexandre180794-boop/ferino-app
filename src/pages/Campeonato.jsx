@@ -574,6 +574,22 @@ function sairModoAdministrador() {
             Usar este mês no app
           </button>
 
+<button
+  type="button"
+  onClick={() => navigate("/editar-elenco")}
+  style={{
+    padding: "12px 18px",
+    border: "1px solid #38bdf8",
+    borderRadius: "8px",
+    background: "#102637",
+    color: "#ffffff",
+    fontWeight: "bold",
+    cursor: "pointer",
+  }}
+>
+  ✏️ Editar elenco do mês
+</button>
+
           <button
             type="button"
             onClick={encerrarCampeonato}

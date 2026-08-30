@@ -179,85 +179,103 @@ function Classificacao() {
     return ordenarClassificacao(lista);
   }
 
-  useEffect(() => {
-    async function buscarClassificacao() {
-      setCarregando(true);
-      setMensagem("");
+  async function buscarClassificacao() {
+  setCarregando(true);
+  setMensagem("");
 
-      try {
-        if (tipoCampeonato === "mes") {
-          const [resultadoTimes, resultadoJogos] = await Promise.all([
-            supabase
-              .from("times")
-              .select("id, nome")
-              .order("nome", { ascending: true }),
+  try {
+    if (tipoCampeonato === "mes") {
+      const [resultadoTimes, resultadoJogos] = await Promise.all([
+        supabase
+          .from("times")
+          .select("id, nome")
+          .order("nome", { ascending: true }),
 
-            supabase
-              .from("jogos_campeonato")
-              .select(
-                "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
-              )
-              .eq("temporada", anoSelecionado)
-              .eq("mes", mesSelecionado),
-          ]);
+        supabase
+          .from("jogos_campeonato")
+          .select(
+            "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
+          )
+          .eq("temporada", anoSelecionado)
+          .eq("mes", mesSelecionado),
+      ]);
 
-          if (resultadoTimes.error) throw resultadoTimes.error;
-          if (resultadoJogos.error) throw resultadoJogos.error;
+      if (resultadoTimes.error) throw resultadoTimes.error;
+      if (resultadoJogos.error) throw resultadoJogos.error;
 
-          const jogosEncerrados = (resultadoJogos.data || []).filter(
-            jogoEstaEncerrado
-          );
+      const jogosEncerrados = (resultadoJogos.data || []).filter(
+        jogoEstaEncerrado
+      );
 
-          const classificacaoOrdenada = calcularClassificacaoMensal(
-            resultadoTimes.data || [],
-            jogosEncerrados
-          );
+      const classificacaoOrdenada = calcularClassificacaoMensal(
+        resultadoTimes.data || [],
+        jogosEncerrados
+      );
 
-          setDadosClassificacao(classificacaoOrdenada);
+      setDadosClassificacao(classificacaoOrdenada);
 
-          if (jogosEncerrados.length === 0) {
-            const nomeMes =
-              MESES.find((item) => item.id === mesSelecionado)?.nome || "";
+      if (jogosEncerrados.length === 0) {
+        const nomeMes =
+          MESES.find((item) => item.id === mesSelecionado)?.nome || "";
 
-            setMensagem(
-              `Nenhuma partida encerrada foi encontrada para ${nomeMes} de ${anoSelecionado}.`
-            );
-          }
-
-          return;
-        }
-
-        const { data, error } = await supabase.rpc(
-          "classificacao_anual",
-          {
-            p_ano: anoSelecionado,
-          }
-        );
-
-        if (error) throw error;
-
-        const classificacaoOrdenada = ordenarClassificacao(data || []);
-
-        setDadosClassificacao(classificacaoOrdenada);
-
-        if (classificacaoOrdenada.length === 0) {
-          setMensagem(
-            `Nenhuma partida encerrada foi encontrada em ${anoSelecionado}.`
-          );
-        }
-      } catch (error) {
-        console.error("Erro ao carregar classificação:", error);
-
-        setDadosClassificacao([]);
         setMensagem(
-          `Erro ao carregar a classificação: ${error.message}`
+          `Nenhuma partida encerrada foi encontrada para ${nomeMes} de ${anoSelecionado}.`
         );
-      } finally {
-        setCarregando(false);
       }
+
+      return;
     }
 
+    const { data, error } = await supabase.rpc(
+      "classificacao_anual",
+      {
+        p_ano: anoSelecionado,
+      }
+    );
+
+    if (error) throw error;
+
+    const classificacaoOrdenada = ordenarClassificacao(data || []);
+
+    setDadosClassificacao(classificacaoOrdenada);
+
+    if (classificacaoOrdenada.length === 0) {
+      setMensagem(
+        `Nenhuma partida encerrada foi encontrada em ${anoSelecionado}.`
+      );
+    }
+  } catch (error) {
+    console.error("Erro ao carregar classificação:", error);
+
+    setDadosClassificacao([]);
+    setMensagem(
+      `Erro ao carregar a classificação: ${error.message}`
+    );
+  } finally {
+    setCarregando(false);
+  }
+}
+
+  useEffect(() => {
     buscarClassificacao();
+  }, [tipoCampeonato, anoSelecionado, mesSelecionado]);
+
+  useEffect(() => {
+    function atualizarAoPuxar() {
+      buscarClassificacao();
+    }
+
+    window.addEventListener(
+      "ferino-atualizar",
+      atualizarAoPuxar
+    );
+
+    return () => {
+      window.removeEventListener(
+        "ferino-atualizar",
+        atualizarAoPuxar
+      );
+    };
   }, [tipoCampeonato, anoSelecionado, mesSelecionado]);
 
   function alterarMes(novoMes) {

@@ -269,6 +269,7 @@ function FichaPartida() {
   const navigate = useNavigate();
 
   const jogo = location.state?.jogo;
+  const modoEdicao = location.state?.modoEdicao === true;
 
   const [golsCasa, setGolsCasa] = useState("");
   const [golsFora, setGolsFora] = useState("");
@@ -299,93 +300,296 @@ function FichaPartida() {
   const [tipoMensagem, setTipoMensagem] =
     useState("erro");
 
-  useEffect(() => {
-    async function carregarDados() {
-      if (!jogo) return;
+useEffect(() => {
+  async function carregarDados() {
+    if (!jogo) return;
 
-      setMensagem("");
+    setMensagem("");
 
-      const [resultadoTimes, resultadoJogadores] =
-        await Promise.all([
-          supabase
-            .from("times")
-            .select("id,nome")
-            .order("nome", { ascending: true }),
+    const anoPartida = Number(jogo.ano);
+    const mesPartida = Number(jogo.mes);
 
-          supabase
-            .from("jogadores")
-            .select("id,nome,time_id,goleiro,times(nome)")
-            .eq("ativo", true)
-            .order("nome", { ascending: true }),
-        ]);
+    const timeCasaIdPartida = Number(
+      jogo.timeAId ?? jogo.time_a_id
+    );
 
-      if (resultadoTimes.error) {
-        console.error(
-          "Erro ao carregar times:",
-          resultadoTimes.error
+    const timeForaIdPartida = Number(
+      jogo.timeBId ?? jogo.time_b_id
+    );
+
+    if (
+      !Number.isFinite(anoPartida) ||
+      !Number.isFinite(mesPartida)
+    ) {
+      setTipoMensagem("erro");
+      setMensagem(
+        "Não foi possível identificar a competência desta partida."
+      );
+      return;
+    }
+
+    try {
+      const {
+        data: temporadaDaPartida,
+        error: erroTemporada,
+      } = await supabase
+        .from("temporadas")
+        .select("id, ano, mes")
+        .eq("ano", anoPartida)
+        .eq("mes", mesPartida)
+        .maybeSingle();
+
+      if (erroTemporada) {
+        throw new Error(
+          `Erro ao localizar a temporada: ${erroTemporada.message}`
         );
-
-        setTipoMensagem("erro");
-        setMensagem(
-          "Não foi possível carregar os times."
-        );
-        return;
       }
 
-      if (resultadoJogadores.error) {
-        console.error(
-          "Erro ao carregar jogadores:",
-          resultadoJogadores.error
+      if (!temporadaDaPartida) {
+        throw new Error(
+          `Não existe elenco registrado para ${mesPartida}/${anoPartida}.`
         );
-
-        setTipoMensagem("erro");
-        setMensagem(
-          "Não foi possível carregar os jogadores."
-        );
-        return;
       }
 
-      const times = resultadoTimes.data || [];
-      const jogadores = resultadoJogadores.data || [];
+      const {
+        data: registrosElenco,
+        error: erroElenco,
+      } = await supabase
+        .from("elencos")
+        .select(`
+          jogador_id,
+          jogador_nome_snapshot,
+          time_id,
+          time_nome_snapshot,
+          ativo,
+          posicao,
+          jogadores (
+            id,
+            nome,
+            goleiro
+          )
+        `)
+        .eq(
+          "temporada_id",
+          Number(temporadaDaPartida.id)
+        )
+        .eq("ativo", true)
+        .order("time_id", { ascending: true })
+        .order("posicao", { ascending: true });
 
-      const timeCasa = times.find(
-        (time) => time.nome === jogo.casa
+      if (erroElenco) {
+        throw new Error(
+          `Erro ao carregar o elenco mensal: ${erroElenco.message}`
+        );
+      }
+
+      const jogadores = (registrosElenco || []).map(
+        (registro) => ({
+          id: Number(registro.jogador_id),
+
+          nome:
+            registro.jogador_nome_snapshot ||
+            registro.jogadores?.nome ||
+            "Jogador",
+
+          time_id: Number(registro.time_id),
+
+          goleiro:
+            registro.jogadores?.goleiro === true,
+
+          times: {
+            nome:
+              registro.time_nome_snapshot ||
+              "Time não informado",
+          },
+        })
       );
 
-      const timeFora = times.find(
-        (time) => time.nome === jogo.fora
-      );
-
-      if (!timeCasa || !timeFora) {
-        setTipoMensagem("erro");
-        setMensagem(
-          "Um dos times da partida não foi encontrado no banco."
-        );
-        return;
-      }
-
-      setTimeCasaId(timeCasa.id);
-      setTimeForaId(timeFora.id);
+      setTimeCasaId(timeCasaIdPartida);
+      setTimeForaId(timeForaIdPartida);
 
       setTodosJogadores(jogadores);
 
       setJogadoresCasa(
-  jogadores.filter(
-    (jogador) =>
-      jogador.time_id === timeCasa.id
-  )
-);
+        jogadores.filter(
+          (jogador) =>
+            Number(jogador.time_id) ===
+            timeCasaIdPartida
+        )
+      );
 
-setJogadoresFora(
-  jogadores.filter(
-    (jogador) =>
-      jogador.time_id === timeFora.id
-  )
-);
+      setJogadoresFora(
+        jogadores.filter(
+          (jogador) =>
+            Number(jogador.time_id) ===
+            timeForaIdPartida
+        )
+      );
+
+      /*
+        MODO NORMAL:
+        termina aqui e deixa a ficha vazia.
+      */
+      if (!modoEdicao) {
+        return;
+      }
+
+      /*
+        MODO EDIÇÃO:
+        busca a partida que já está salva.
+      */
+      const partidaId = Number(
+        jogo.partidaId ?? jogo.partida_id
+      );
+
+      if (!partidaId) {
+        throw new Error(
+          "Não foi possível identificar a partida que será editada."
+        );
+      }
+
+      const [
+        resultadoPartida,
+        resultadoGols,
+      ] = await Promise.all([
+        supabase
+          .from("partidas")
+          .select(`
+            id,
+            time_a_id,
+            time_b_id,
+            gols_a,
+            gols_b,
+            goleiro_a_id,
+            goleiro_b_id
+          `)
+          .eq("id", partidaId)
+          .single(),
+
+        supabase
+          .from("gols_partida")
+          .select(`
+            jogador_id,
+            time_id,
+            quantidade
+          `)
+          .eq("partida_id", partidaId),
+      ]);
+
+      if (resultadoPartida.error) {
+        throw new Error(
+          `Erro ao carregar a partida: ${resultadoPartida.error.message}`
+        );
+      }
+
+      if (resultadoGols.error) {
+        throw new Error(
+          `Erro ao carregar os gols: ${resultadoGols.error.message}`
+        );
+      }
+
+      const partida = resultadoPartida.data;
+      const golsRegistrados =
+        resultadoGols.data || [];
+
+      setGolsCasa(String(partida.gols_a ?? 0));
+      setGolsFora(String(partida.gols_b ?? 0));
+
+      setGoleiroCasa(
+        partida.goleiro_a_id
+          ? String(partida.goleiro_a_id)
+          : ""
+      );
+
+      setGoleiroFora(
+        partida.goleiro_b_id
+          ? String(partida.goleiro_b_id)
+          : ""
+      );
+
+      setContarGolsCasa(true);
+      setContarGolsFora(true);
+
+      function montarAutores(
+        timeId,
+        totalPlacar
+      ) {
+        const lista = [];
+
+        golsRegistrados
+          .filter(
+            (gol) =>
+              Number(gol.time_id) === Number(timeId)
+          )
+          .forEach((gol) => {
+            const quantidade =
+              Number(gol.quantidade || 0);
+
+            for (
+              let indice = 0;
+              indice < quantidade;
+              indice += 1
+            ) {
+              lista.push({
+                jogadorId:
+                  String(gol.jogador_id),
+                contaArtilharia: true,
+              });
+            }
+          });
+
+        /*
+          Se o placar tem mais gols do que a
+          tabela gols_partida, mostramos claramente
+          que existe gol sem registro.
+        */
+        while (lista.length < Number(totalPlacar)) {
+          lista.push({
+            jogadorId: "gol-contra",
+            contaArtilharia: false,
+          });
+        }
+
+        return lista.slice(
+          0,
+          Number(totalPlacar)
+        );
+      }
+
+      setAutoresCasa(
+        montarAutores(
+          timeCasaIdPartida,
+          partida.gols_a
+        )
+      );
+
+      setAutoresFora(
+        montarAutores(
+          timeForaIdPartida,
+          partida.gols_b
+        )
+      );
+
+      setTipoMensagem("sucesso");
+      setMensagem(
+        "✏️ Modo de correção: altere apenas o que estiver errado e salve novamente."
+      );
+    } catch (erro) {
+      console.error(
+        "Erro ao carregar dados da partida:",
+        erro
+      );
+
+      setTipoMensagem("erro");
+      setMensagem(
+        erro.message ||
+          "Não foi possível carregar os dados desta partida."
+      );
     }
+  }
 
-    carregarDados();
-  }, [jogo]);
+  carregarDados();
+}, [jogo, modoEdicao]);
 
   const goleiros = useMemo(() => {
     const jogadoresMarcadosComoGoleiro =
@@ -455,10 +659,12 @@ setJogadoresFora(
         if (posicao !== indice) return autor;
 
         if (campo === "jogadorId") {
-          if (valor === "gol-contra") {
+         if (
+  valor === "gol-contra"
+) {
             return {
               ...autor,
-              jogadorId: "gol-contra",
+              jogadorId: valor,
               contaArtilharia: false,
             };
           }
@@ -484,10 +690,12 @@ setJogadoresFora(
         if (posicao !== indice) return autor;
 
         if (campo === "jogadorId") {
-          if (valor === "gol-contra") {
+          if (
+  valor === "gol-contra"
+) {
             return {
               ...autor,
-              jogadorId: "gol-contra",
+              jogadorId: valor,
               contaArtilharia: false,
             };
           }
@@ -515,13 +723,13 @@ setJogadoresFora(
         Um gol desmarcado continua fazendo parte
         do placar, mas não entra na artilharia.
       */
-      if (
-        !autor.jogadorId ||
-        autor.jogadorId === "gol-contra" ||
-        autor.contaArtilharia !== true
-      ) {
-        return;
-      }
+     if (
+  !autor.jogadorId ||
+  autor.jogadorId === "gol-contra" ||
+  autor.contaArtilharia !== true
+) {
+  return;
+}
 
       const jogadorId = autor.jogadorId;
 
@@ -604,166 +812,149 @@ setJogadoresFora(
   }
 
   async function finalizarPartida() {
-    if (
-      bloqueioEnvioRef.current ||
-      salvando ||
-      finalizado
-    ) {
-      return;
-    }
+  if (
+    bloqueioEnvioRef.current ||
+    salvando ||
+    finalizado
+  ) {
+    return;
+  }
 
-    setMensagem("");
+  setMensagem("");
 
-    const erroValidacao = validarPartida();
+  const erroValidacao = validarPartida();
 
-    if (erroValidacao) {
-      setTipoMensagem("erro");
-      setMensagem(erroValidacao);
-      return;
-    }
+  if (erroValidacao) {
+    setTipoMensagem("erro");
+    setMensagem(erroValidacao);
+    return;
+  }
 
-    const confirmar = window.confirm(
-      `Confirmar o resultado?\n\n${jogo.casa} ${golsCasa} x ${golsFora} ${jogo.fora}`
+  const confirmar = window.confirm(
+    modoEdicao
+      ? `Salvar a correção?\n\n${jogo.casa} ${golsCasa} x ${golsFora} ${jogo.fora}`
+      : `Confirmar o resultado?\n\n${jogo.casa} ${golsCasa} x ${golsFora} ${jogo.fora}`
+  );
+
+  if (!confirmar) return;
+
+  bloqueioEnvioRef.current = true;
+  setSalvando(true);
+
+  let concluidoComSucesso = false;
+
+  try {
+    const golsRegistrados = [
+      ...agruparAutores(autoresCasa),
+      ...agruparAutores(autoresFora),
+    ];
+
+    const golsSofridosGoleiroCasa =
+      contarGolsCasa ? Number(golsFora) : 0;
+
+    const golsSofridosGoleiroFora =
+      contarGolsFora ? Number(golsCasa) : 0;
+
+    const jogoCampeonatoId = Number(
+      jogo.jogoCampeonatoId ?? jogo.id
     );
 
-    if (!confirmar) return;
+    if (!jogoCampeonatoId) {
+      throw new Error(
+        "Não foi possível identificar o jogo do campeonato."
+      );
+    }
 
-    bloqueioEnvioRef.current = true;
-    setSalvando(true);
+    let partidaId;
+    let erroFinalizacao;
 
-    let concluidoComSucesso = false;
-
-    try {
-      const {
-        data: partidaId,
-        error: erroPartida,
-      } = await supabase.rpc("registrar_partida", {
-        p_time_a: Number(timeCasaId),
-        p_time_b: Number(timeForaId),
-        p_gols_a: Number(golsCasa),
-        p_gols_b: Number(golsFora),
-      });
-
-      if (erroPartida) {
-        throw new Error(
-          `Erro ao registrar a partida: ${erroPartida.message}`
-        );
-      }
-
-      if (!partidaId) {
-        throw new Error(
-          "O Supabase não retornou o código da partida."
-        );
-      }
-
-      const golsRegistrados = [
-        ...agruparAutores(autoresCasa),
-        ...agruparAutores(autoresFora),
-      ];
-
-      /*
-        A função é chamada mesmo quando todos os gols forem
-        "gol contra" ou estiverem fora da artilharia.
-        Nesse caso, enviamos um array vazio. A função do Supabase
-        aceita que a soma dos gols atribuídos seja menor que o placar.
-      */
-      const { error: erroGols } =
-        await supabase.rpc(
-          "registrar_gols_da_partida",
-          {
-            p_partida_id: Number(partidaId),
-            p_gols: golsRegistrados,
-          }
-        );
-
-      if (erroGols) {
-        throw new Error(
-          `O placar foi salvo, mas houve erro nos autores dos gols: ${erroGols.message}`
-        );
-      }
-
-      const golsSofridosGoleiroCasa =
-        contarGolsCasa ? Number(golsFora) : 0;
-
-      const golsSofridosGoleiroFora =
-        contarGolsFora ? Number(golsCasa) : 0;
-
-      const { error: erroGoleiros } =
-        await supabase.rpc(
-          "registrar_goleiros_da_partida",
-          {
-            p_partida_id: Number(partidaId),
-            p_goleiro_a: Number(goleiroCasa),
-            p_goleiro_b: Number(goleiroFora),
-            p_gols_sofridos_a:
-              golsSofridosGoleiroCasa,
-            p_gols_sofridos_b:
-              golsSofridosGoleiroFora,
-          }
-        );
-
-      if (erroGoleiros) {
-        throw new Error(
-          `A partida e os gols foram salvos, mas houve erro nos goleiros: ${erroGoleiros.message}`
-        );
-      }
-
-      const { error: erroCalendario } =
-        await supabase
-          .from("jogos_campeonato")
-          .update({
-            status: "encerrado",
-            gols_a: Number(golsCasa),
-            gols_b: Number(golsFora),
-            partida_id: Number(partidaId),
-          })
-          .eq(
-            "id",
-            Number(
-              jogo.jogoCampeonatoId ?? jogo.id
-            )
-          );
-
-      if (erroCalendario) {
-        throw new Error(
-          `A partida foi registrada, porém o calendário não foi atualizado: ${erroCalendario.message}`
-        );
-      }
-
-      concluidoComSucesso = true;
-      setFinalizado(true);
-      setTipoMensagem("sucesso");
-      setMensagem(
-        "✅ Partida finalizada! Aguarde o retorno para a tela de jogos."
+    if (modoEdicao) {
+      const resultado = await supabase.rpc(
+        "editar_partida_campeonato",
+        {
+          p_jogo_campeonato_id: jogoCampeonatoId,
+          p_gols_a: Number(golsCasa),
+          p_gols_b: Number(golsFora),
+          p_gols: golsRegistrados,
+          p_goleiro_a: Number(goleiroCasa),
+          p_goleiro_b: Number(goleiroFora),
+        }
       );
 
-      setTimeout(() => {
-        navigate("/jogos", {
-          replace: true,
-          state: {
-            mensagem:
-              "Partida registrada com sucesso.",
-          },
-        });
-      }, 1200);
-    } catch (erro) {
-      console.error(
-        "Erro ao finalizar a partida:",
-        erro
+      partidaId = resultado.data;
+      erroFinalizacao = resultado.error;
+    } else {
+      const resultado = await supabase.rpc(
+        "finalizar_partida_campeonato",
+        {
+          p_jogo_campeonato_id: jogoCampeonatoId,
+          p_gols_a: Number(golsCasa),
+          p_gols_b: Number(golsFora),
+          p_gols: golsRegistrados,
+          p_goleiro_a: Number(goleiroCasa),
+          p_goleiro_b: Number(goleiroFora),
+          p_gols_sofridos_a: golsSofridosGoleiroCasa,
+          p_gols_sofridos_b: golsSofridosGoleiroFora,
+        }
       );
 
-      setTipoMensagem("erro");
-      setMensagem(
-        erro.message ||
+      partidaId = resultado.data;
+      erroFinalizacao = resultado.error;
+    }
+
+    if (erroFinalizacao) {
+      throw new Error(
+        erroFinalizacao.message ||
           "Não foi possível finalizar a partida."
       );
-    } finally {
-      if (!concluidoComSucesso) {
-        bloqueioEnvioRef.current = false;
-        setSalvando(false);
-      }
+    }
+
+    if (!partidaId) {
+      throw new Error(
+        "O Supabase não retornou o código da partida."
+      );
+    }
+
+    concluidoComSucesso = true;
+
+    setFinalizado(true);
+    setTipoMensagem("sucesso");
+
+    setMensagem(
+      modoEdicao
+        ? "✅ Correção salva com segurança!"
+        : "✅ Partida finalizada com segurança!"
+    );
+
+    setTimeout(() => {
+      navigate("/jogos", {
+        replace: true,
+        state: {
+          mensagem: modoEdicao
+            ? "Correção salva com sucesso."
+            : "Partida registrada com sucesso.",
+        },
+      });
+    }, 1200);
+  } catch (erro) {
+    console.error(
+      "Erro ao finalizar a partida:",
+      erro
+    );
+
+    setTipoMensagem("erro");
+
+    setMensagem(
+      erro.message ||
+        "Não foi possível finalizar a partida."
+    );
+  } finally {
+    if (!concluidoComSucesso) {
+      bloqueioEnvioRef.current = false;
+      setSalvando(false);
     }
   }
+}
   if (!jogo) {
     return (
       <main className="page">
@@ -1220,6 +1411,7 @@ setJogadoresFora(
                     finalizado ||
                     autor.jogadorId === "gol-contra"
                   }
+                  
                   onChange={(evento) =>
                     alterarAutorCasa(
                       indice,
@@ -1336,9 +1528,13 @@ setJogadoresFora(
           }}
         >
           {finalizado
-            ? "✅ PARTIDA FINALIZADA"
+            ? modoEdicao
+              ? "✅ CORREÇÃO SALVA"
+              : "✅ PARTIDA FINALIZADA"
             : salvando
             ? "⏳ SALVANDO..."
+            : modoEdicao
+            ? "✏️ SALVAR CORREÇÃO"
             : "✅ FINALIZAR PARTIDA"}
         </button>
       </div>

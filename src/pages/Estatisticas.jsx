@@ -313,16 +313,19 @@ function Estatisticas() {
 
   // CORREÇÃO: Removido o !jogador.goleiro para permitir goleiros marcarem gols na artilharia geral
   const artilheirosMensais = useMemo(
-    () =>
-      jogadoresMensais
-        .filter((jogador) => jogador.gols > 0)
-        .sort(
-          (a, b) =>
-            b.gols - a.gols ||
-            a.nome.localeCompare(b.nome, "pt-BR")
-        ),
-    [jogadoresMensais]
-  );
+  () =>
+    [...jogadoresMensais]
+      .filter((jogador) => jogador.gols > 0)
+      .sort(
+        (a, b) =>
+          b.gols - a.gols ||
+          b.pontosTime - a.pontosTime ||
+          b.saldoTime - a.saldoTime ||
+          b.golsProTime - a.golsProTime ||
+          a.nome.localeCompare(b.nome, "pt-BR")
+      ),
+  [jogadoresMensais]
+);
 
   const artilheirosExibidos =
     filtroArtilharia === "mes"

@@ -7,6 +7,8 @@ import { Browser } from "@capacitor/browser";
 import Header from "./components/Header";
 import Menu from "./components/Menu";
 import TelaAcesso from "./components/TelaAcesso";
+import SwipeNavigation from "./components/SwipeNavigation";
+import PullToRefresh from "./components/PullToRefresh";
 
 import Home from "./pages/Home";
 import Jogos from "./pages/Jogos";
@@ -15,8 +17,10 @@ import Classificacao from "./pages/Classificacao";
 import Estatisticas from "./pages/Estatisticas";
 import Jogadores from "./pages/Jogadores";
 import Substituicao from "./pages/Substituicao";
+import TrocaDefinitiva from "./pages/TrocaDefinitiva";
 import Campeoes from "./pages/Campeoes";
 import Campeonato from "./pages/Campeonato";
+import EditarElenco from "./pages/EditarElenco";
 import FichaPartida from "./pages/FichaPartida";
 import Perfil from "./pages/Perfil";
 
@@ -68,7 +72,9 @@ function App() {
       }
     }
 
-    async function tratarRetornoDoLogin({ url }) {
+    async function tratarRetornoDoLogin({
+      url,
+    }) {
       if (!url?.startsWith(URL_RETORNO)) {
         return;
       }
@@ -105,7 +111,10 @@ function App() {
           const refreshToken =
             hash.get("refresh_token");
 
-          if (!accessToken || !refreshToken) {
+          if (
+            !accessToken ||
+            !refreshToken
+          ) {
             throw new Error(
               "O retorno do Google não trouxe uma sessão válida."
             );
@@ -212,66 +221,81 @@ function App() {
   }
 
   return (
-    <div className="app">
+  <div className="app app-shell">
       <Header />
+
+      <PullToRefresh>
+        <SwipeNavigation>
+          <Routes>
+            <Route
+              path="/"
+              element={<Home />}
+            />
+
+            <Route
+              path="/classificacao"
+              element={<Classificacao />}
+            />
+
+            <Route
+              path="/jogos"
+              element={<Jogos />}
+            />
+
+            <Route
+              path="/partidas"
+              element={<Partidas />}
+            />
+
+            <Route
+              path="/estatisticas"
+              element={<Estatisticas />}
+            />
+
+            <Route
+              path="/campeoes"
+              element={<Campeoes />}
+            />
+
+            <Route
+              path="/jogadores"
+              element={<Jogadores />}
+            />
+
+            <Route
+              path="/substituicao"
+              element={<Substituicao />}
+            />
+
+            <Route
+              path="/troca-definitiva"
+              element={<TrocaDefinitiva />}
+            />
+
+            <Route
+              path="/campeonato"
+              element={<Campeonato />}
+            />
+
+            <Route
+              path="/editar-elenco"
+              element={<EditarElenco />}
+            />
+
+            <Route
+              path="/ficha-partida"
+              element={<FichaPartida />}
+            />
+
+            <Route
+              path="/perfil"
+              element={<Perfil />}
+            />
+          </Routes>
+        </SwipeNavigation>
+      </PullToRefresh>
+
       <Menu />
-
-      <Routes>
-        <Route
-          path="/"
-          element={<Home />}
-        />
-
-        <Route
-          path="/jogos"
-          element={<Jogos />}
-        />
-
-        <Route
-          path="/partidas"
-          element={<Partidas />}
-        />
-
-        <Route
-          path="/classificacao"
-          element={<Classificacao />}
-        />
-
-        <Route
-          path="/estatisticas"
-          element={<Estatisticas />}
-        />
-
-        <Route
-          path="/jogadores"
-          element={<Jogadores />}
-        />
-
-        <Route
-          path="/substituicao"
-          element={<Substituicao />}
-        />
-
-        <Route
-          path="/campeoes"
-          element={<Campeoes />}
-        />
-
-        <Route
-          path="/campeonato"
-          element={<Campeonato />}
-        />
-
-        <Route
-          path="/ficha-partida"
-          element={<FichaPartida />}
-        />
-
-        <Route
-          path="/perfil"
-          element={<Perfil />}
-        />
-      </Routes>
     </div>
   );
 }
