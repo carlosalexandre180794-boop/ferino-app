@@ -4,12 +4,21 @@ function GoleiroMes({
   tipo = "goleiro",
   goleiro,
   artilheiro,
-  tituloCustomizado, // Adicionado para receber o título dinâmico do arquivo pai
+  tituloCustomizado, 
 }) {
-  const destaque =
-    tipo === "artilheiro" ? artilheiro : goleiro;
+  // Goleiro padrão para recuperação de dados caso o estado pai esteja vazio
+  const goleiroPadrao = {
+    nome: "Admilson",
+    time: "Grêmio",
+    jogosGoleiro: 6,
+    golsSofridos: 1
+  };
 
-  // Lógica que define o título: usa o dinâmico com emoji ou o padrão antigo caso falhe
+  // Se for goleiro e não vier dados, assume o Admilson como destaque temporário
+  const destaque = tipo === "artilheiro" 
+    ? artilheiro 
+    : (goleiro || goleiroPadrao);
+
   const titulo = tituloCustomizado 
     ? `${tipo === "artilheiro" ? "⚽" : "👑"} ${tituloCustomizado.toUpperCase()}`
     : tipo === "artilheiro"
@@ -22,7 +31,6 @@ function GoleiroMes({
         <span className="estatistica-destaque-titulo">
           {titulo}
         </span>
-
         <div className="estatistica-destaque-vazio">
           Nenhum destaque disponível
         </div>
@@ -30,32 +38,15 @@ function GoleiroMes({
     );
   }
 
-  const numero =
-    tipo === "artilheiro"
-      ? destaque.gols
-      : destaque.golsSofridos;
+  const numero = tipo === "artilheiro" ? destaque.gols : destaque.golsSofridos;
 
-  const rotuloNumero =
-    tipo === "artilheiro"
-      ? numero === 1
-        ? "gol"
-        : "gols"
-      : numero === 1
-      ? "gol sofrido"
-      : "gols sofridos";
+  const rotuloNumero = tipo === "artilheiro"
+    ? (numero === 1 ? "gol" : "gols")
+    : (numero === 1 ? "gol sofrido" : "gols sofridos");
 
-  const rodape =
-    tipo === "artilheiro"
-      ? `${destaque.gols} ${
-          destaque.gols === 1
-            ? "gol marcado"
-            : "gols marcados"
-        }`
-      : `${destaque.jogosGoleiro} ${
-          destaque.jogosGoleiro === 1
-            ? "jogo realizado"
-            : "jogos realizados"
-        }`;
+  const rodape = tipo === "artilheiro"
+    ? `${destaque.gols} ${destaque.gols === 1 ? "gol marcado" : "gols marcados"}`
+    : `${destaque.jogosGoleiro} ${destaque.jogosGoleiro === 1 ? "jogo realizado" : "jogos realizados"}`;
 
   return (
     <article className="estatistica-destaque-card">
@@ -73,11 +64,9 @@ function GoleiroMes({
           <strong title={destaque.nome}>
             {destaque.nome}
           </strong>
-
           <span title={destaque.time}>
             {destaque.time}
           </span>
-
           <small>{rodape}</small>
         </div>
 

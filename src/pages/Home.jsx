@@ -15,7 +15,7 @@ function Home() {
   const [dados, setDados] = useState({
     lider: null,
     vice: null,
-    lanterna: null,
+    terceiro: null,
     artilheiro: null,
     melhorGoleiro: null,
     jogosEncerrados: 0,
@@ -27,133 +27,240 @@ function Home() {
 
   useEffect(() => {
     async function carregarPainel() {
+      setCarregando(true);
+
       try {
-        const [
-          resTimes,
-          resArtilheiros,
-          resGoleiros,
-          resPartidas,
-        ] = await Promise.all([
+        const agora = new Date();
+        const anoAtual = agora.getFullYear();
+        const mesAtual = agora.getMonth() + 1;
+
+        const { data: temporadaAtual, error: erroTemporada } = await supabase
+          .from("temporadas")
+          .select("id, ano, mes, status")
+          .eq("ano", anoAtual)
+          .eq("mes", mesAtual)
+          .maybeSingle();
+
+        if (erroTemporada) throw erroTemporada;
+
+        if (!temporadaAtual) {
+          setDados({
+            lider: null,
+            vice: null,
+            terceiro: null,
+            artilheiro: null,
+            melhorGoleiro: null,
+            jogosEncerrados: 0,
+            totalGols: 0,
+            mediaGols: "0.0",
+          });
+          return;
+        }
+
+        const [resTimes, resJogos, resEstatisticas, resPartidasAcumuladas] = await Promise.all([
           supabase
             .from("times")
-            .select("*")
-            .order("pontos", { ascending: false })
-            .order("saldo", { ascending: false })
-            .order("gols_pro", { ascending: false }),
+            .select("id, nome"),
 
           supabase
-            .from("jogadores")
+            .from("jogos_campeonato")
             .select(`
               id,
-              nome,
-              gols,
-              goleiro,
+              time_a_id,
+              time_b_id,
+              gols_a,
+              gols_b,
+              status,
+              partida_id
+            `)
+            .eq("temporada", anoAtual)
+            .eq("mes", mesAtual),
+
+          supabase
+            .from("estatisticas_mensais")
+            .select(`
+              id,
+              jogador_id,
               time_id,
-              times (
-                nome,
-                pontos,
-                saldo,
-                gols_pro
-              )
-            `)
-            .gt("gols", 0),
-
-          supabase
-            .from("jogadores")
-            .select(`
-              id,
-              nome,
-              gols_sofridos,
+              jogador_nome_snapshot,
+              time_nome_snapshot,
+              gols,
               jogos_goleiro,
-              times (
-                nome,
-                pontos,
-                saldo,
-                gols_pro
-              )
+              gols_sofridos
             `)
-            .eq("goleiro", true),
+            .eq("temporada_id", temporadaAtual.id),
 
+          // Resumo geral do projeto: mantém o acumulado de todas as partidas
+          // já registradas, como o painel mostrava antes.
           supabase
             .from("partidas")
             .select("gols_a, gols_b"),
         ]);
 
         if (resTimes.error) throw resTimes.error;
-        if (resArtilheiros.error) throw resArtilheiros.error;
-        if (resGoleiros.error) throw resGoleiros.error;
-        if (resPartidas.error) throw resPartidas.error;
+        if (resJogos.error) throw resJogos.error;
+        if (resEstatisticas.error) throw resEstatisticas.error;
+        if (resPartidasAcumuladas.error) throw resPartidasAcumuladas.error;
 
-       const times = [...(resTimes.data || [])].sort(
-  (a, b) =>
-    Number(b.pontos || 0) - Number(a.pontos || 0) ||
-    Number(b.vitorias || 0) - Number(a.vitorias || 0) ||
-    Number(b.saldo || 0) - Number(a.saldo || 0) ||
-    Number(b.gols_pro || 0) - Number(a.gols_pro || 0) ||
-    String(a.nome || "").localeCompare(
-      String(b.nome || ""),
-      "pt-BR"
-    )
-);
-const partidas = resPartidas.data || [];
-        const artilheirosOrdenados = (resArtilheiros.data || [])
-          .map((jogador) => ({
-            ...jogador,
-            gols: Number(jogador.gols || 0),
-            pontosTime: Number(jogador.times?.pontos || 0),
-            saldoTime: Number(jogador.times?.saldo || 0),
-            golsProTime: Number(jogador.times?.gols_pro || 0),
+        const timesBase = resTimes.data || [];
+        const jogosDoMes = resJogos.data || [];
+        const estatisticasDoMes = resEstatisticas.data || [];
+        const partidasAcumuladas = resPartidasAcumuladas.data || [];
+
+        const mapaTimes = new Map(
+          timesBase.map((time) => [
+            Number(time.id),
+            {
+              id: Number(time.id),
+              nome: time.nome,
+              pontos: 0,
+              jogos: 0,
+              vitorias: 0,
+              empates: 0,
+              derrotas: 0,
+              gols_pro: 0,
+              gols_contra: 0,
+              saldo: 0,
+            },
+          ])
+        );
+
+        function jogoEncerrado(jogo) {
+          const status = String(jogo.status || "").toLowerCase();
+
+          return (
+            status === "encerrado" ||
+            status === "encerrada" ||
+            status === "finalizado" ||
+            status === "finalizada" ||
+            jogo.partida_id !== null
+          );
+        }
+
+        const jogosEncerrados = jogosDoMes.filter(jogoEncerrado);
+
+        jogosEncerrados.forEach((jogo) => {
+          const timeA = mapaTimes.get(Number(jogo.time_a_id));
+          const timeB = mapaTimes.get(Number(jogo.time_b_id));
+
+          if (!timeA || !timeB) return;
+
+          const golsA = Number(jogo.gols_a ?? 0);
+          const golsB = Number(jogo.gols_b ?? 0);
+
+          timeA.jogos += 1;
+          timeB.jogos += 1;
+
+          timeA.gols_pro += golsA;
+          timeA.gols_contra += golsB;
+          timeB.gols_pro += golsB;
+          timeB.gols_contra += golsA;
+
+          if (golsA > golsB) {
+            timeA.pontos += 3;
+            timeA.vitorias += 1;
+            timeB.derrotas += 1;
+          } else if (golsB > golsA) {
+            timeB.pontos += 3;
+            timeB.vitorias += 1;
+            timeA.derrotas += 1;
+          } else {
+            timeA.pontos += 1;
+            timeB.pontos += 1;
+            timeA.empates += 1;
+            timeB.empates += 1;
+          }
+        });
+
+        const classificacao = Array.from(mapaTimes.values())
+          .map((time) => ({
+            ...time,
+            saldo: time.gols_pro - time.gols_contra,
           }))
-          .filter((jogador) => jogador.gols > 0)
+          .sort(
+            (a, b) =>
+              b.pontos - a.pontos ||
+              b.vitorias - a.vitorias ||
+              b.saldo - a.saldo ||
+              b.gols_pro - a.gols_pro ||
+              String(a.nome || "").localeCompare(
+                String(b.nome || ""),
+                "pt-BR"
+              )
+          );
+
+        const posicaoPorTime = new Map(
+          classificacao.map((time, indice) => [
+            Number(time.id),
+            indice + 1,
+          ])
+        );
+
+        const artilheirosOrdenados = estatisticasDoMes
+          .filter((item) => Number(item.gols || 0) > 0)
+          .map((item) => ({
+            id: Number(item.jogador_id),
+            nome: item.jogador_nome_snapshot || "Não informado",
+            gols: Number(item.gols || 0),
+            time_id: Number(item.time_id),
+            time_nome: item.time_nome_snapshot || "",
+            posicaoTime:
+              posicaoPorTime.get(Number(item.time_id)) ??
+              Number.POSITIVE_INFINITY,
+          }))
           .sort(
             (a, b) =>
               b.gols - a.gols ||
-              b.pontosTime - a.pontosTime ||
-              b.saldoTime - a.saldoTime ||
-              b.golsProTime - a.golsProTime ||
+              a.posicaoTime - b.posicaoTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
           );
 
-        const goleirosOrdenados = (resGoleiros.data || [])
-          .map((goleiro) => ({
-            ...goleiro,
-            gols_sofridos: Number(goleiro.gols_sofridos || 0),
-            jogos_goleiro: Number(goleiro.jogos_goleiro || 0),
-            pontosTime: Number(goleiro.times?.pontos || 0),
-            saldoTime: Number(goleiro.times?.saldo || 0),
-            golsProTime: Number(goleiro.times?.gols_pro || 0),
-          }))
-          .filter((goleiro) => goleiro.jogos_goleiro > 0)
-          .sort((a, b) => {
-            const mediaA = a.gols_sofridos / a.jogos_goleiro;
-            const mediaB = b.gols_sofridos / b.jogos_goleiro;
+        const goleirosOrdenados = estatisticasDoMes
+          .filter((item) => Number(item.jogos_goleiro || 0) > 0)
+          .map((item) => {
+            const jogos = Number(item.jogos_goleiro || 0);
+            const sofridos = Number(item.gols_sofridos || 0);
 
-            return (
-              mediaA - mediaB ||
+            return {
+              id: Number(item.jogador_id),
+              nome: item.jogador_nome_snapshot || "Não informado",
+              jogos_goleiro: jogos,
+              gols_sofridos: sofridos,
+              time_id: Number(item.time_id),
+              time_nome: item.time_nome_snapshot || "",
+              media:
+                jogos > 0
+                  ? sofridos / jogos
+                  : Number.POSITIVE_INFINITY,
+              posicaoTime:
+                posicaoPorTime.get(Number(item.time_id)) ??
+                Number.POSITIVE_INFINITY,
+            };
+          })
+          .sort(
+            (a, b) =>
+              a.media - b.media ||
               a.gols_sofridos - b.gols_sofridos ||
               b.jogos_goleiro - a.jogos_goleiro ||
-              b.pontosTime - a.pontosTime ||
-              b.saldoTime - a.saldoTime ||
-              b.golsProTime - a.golsProTime ||
+              a.posicaoTime - b.posicaoTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
-            );
-          });
+          );
 
-        const somaGols = partidas.reduce(
+        // Os destaques acima são mensais, mas estes 3 números são acumulados.
+        const somaGols = partidasAcumuladas.reduce(
           (total, partida) =>
             total +
-            Number(partida.gols_a || 0) +
-            Number(partida.gols_b || 0),
+            Number(partida.gols_a ?? 0) +
+            Number(partida.gols_b ?? 0),
           0
         );
 
-        const quantidadeJogos = partidas.length;
+        const quantidadeJogos = partidasAcumuladas.length;
 
         setDados({
-          lider: times[0] || null,
-          vice: times[1] || null,
-          lanterna:
-            times.length > 0 ? times[times.length - 1] : null,
+          lider: classificacao[0] || null,
+          vice: classificacao[1] || null,
+          terceiro: classificacao[2] || null,
           artilheiro: artilheirosOrdenados[0] || null,
           melhorGoleiro: goleirosOrdenados[0] || null,
           jogosEncerrados: quantidadeJogos,
@@ -164,7 +271,7 @@ const partidas = resPartidas.data || [];
               : "0.0",
         });
       } catch (error) {
-        console.error("Erro ao carregar painel:", error);
+        console.error("Erro ao carregar painel mensal:", error);
       } finally {
         setCarregando(false);
       }
@@ -181,8 +288,8 @@ const partidas = resPartidas.data || [];
     );
   }
 
-  const nomeTimeArtilheiro = dados.artilheiro?.times?.nome || "";
-  const nomeTimeGoleiro = dados.melhorGoleiro?.times?.nome || "";
+  const nomeTimeArtilheiro = dados.artilheiro?.time_nome || "";
+  const nomeTimeGoleiro = dados.melhorGoleiro?.time_nome || "";
 
   const mediaGoleiro =
     dados.melhorGoleiro?.jogos_goleiro > 0
@@ -540,21 +647,21 @@ const partidas = resPartidas.data || [];
           <article className="highlight-card lantern-card">
             <div className="highlight-title">
               <span className="highlight-icon">🔻</span>
-              <strong>Lanterna</strong>
+              <strong>3º lugar</strong>
             </div>
 
-            {dados.lanterna ? (
+            {dados.terceiro ? (
               <div className="highlight-person">
                 <img
-                  src={escudoDoTime(dados.lanterna)}
-                  alt={`Escudo do ${dados.lanterna.nome}`}
+                  src={escudoDoTime(dados.terceiro)}
+                  alt={`Escudo do ${dados.terceiro.nome}`}
                   className="home-highlight-shield"
                   decoding="async"
                 />
 
                 <div>
-                  <h2>{dados.lanterna.nome}</h2>
-                  <p>{dados.lanterna.pontos ?? 0} pontos</p>
+                  <h2>{dados.terceiro.nome}</h2>
+                  <p>{dados.terceiro.pontos ?? 0} pontos</p>
                 </div>
               </div>
             ) : (

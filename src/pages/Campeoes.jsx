@@ -150,184 +150,225 @@ function Campeoes() {
         String(temporadaSelecionada?.status || "").toLowerCase() ===
         "encerrada";
 
-      if (!dadosCampeoes || dadosCampeoes.length === 0) {
+      const itemSalvo =
+        dadosCampeoes && dadosCampeoes.length > 0
+          ? dadosCampeoes[0]
+          : null;
+
+      /*
+       * Mês encerrado:
+       * usa exclusivamente o registro oficial salvo em campeoes_mensais.
+       *
+       * Mês em andamento:
+       * mesmo que ainda NÃO exista registro em campeoes_mensais, cria um
+       * item provisório visual e alimenta os cards com os dados mensais vivos.
+       */
+      if (campeonatoEncerrado) {
+        if (!itemSalvo) {
+          setHistorico([]);
+          return;
+        }
+
+        setHistorico([{
+          id: itemSalvo.id,
+          mes: itemSalvo.mes,
+          ano: itemSalvo.ano,
+          provisorio: false,
+          campeao: itemSalvo.campeao?.nome || "Não informado",
+          vice: itemSalvo.vice?.nome || "Não informado",
+          terceiro: itemSalvo.terceiro?.nome || "Não informado",
+          artilheiro: capitalizarNome(
+            itemSalvo.artilheiro_nome || "Não informado"
+          ),
+          gols_artilheiro: Number(itemSalvo.gols_artilheiro || 0),
+          goleiro: capitalizarNome(
+            itemSalvo.goleiro_nome || "Não informado"
+          ),
+          gols_sofridos_goleiro: Number(
+            itemSalvo.gols_sofridos_goleiro || 0
+          ),
+          jogos_goleiro: Number(itemSalvo.jogos_goleiro || 0),
+          foto_campeao_url: itemSalvo.foto_campeao,
+          foto_vice_url: itemSalvo.foto_vice,
+          foto_terceiro_url: itemSalvo.foto_terceiro,
+          foto_artilheiro_url: itemSalvo.foto_artilheiro,
+          foto_goleiro_url: itemSalvo.foto_goleiro,
+        }]);
+
+        return;
+      }
+
+      // Sem temporada criada ainda, não existe campeonato para acompanhar.
+      if (!temporadaSelecionada?.id) {
         setHistorico([]);
         return;
       }
 
-      const item = dadosCampeoes[0];
+      const [
+        { data: timesAtuais, error: erroTimesAtuais },
+        { data: jogosAtuais, error: erroJogosAtuais },
+        { data: estatisticasMensais, error: erroEstatisticasMensais },
+      ] = await Promise.all([
+        supabase
+          .from("times")
+          .select("id, nome"),
 
-      let campeaoAtual =
-        item.campeao?.nome || "Não informado";
-      let viceAtual =
-        item.vice?.nome || "Não informado";
-      let terceiroAtual =
-        item.terceiro?.nome || "Não informado";
+        supabase
+          .from("jogos_campeonato")
+          .select(
+            "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
+          )
+          .eq("temporada", anoSelecionado)
+          .eq("mes", mesSelecionado),
 
-      let nomeArtilheiro = "Não informado";
-      let golsArtilheiro = 0;
+        supabase
+          .from("estatisticas_mensais")
+          .select(`
+            jogador_id,
+            jogador_nome_snapshot,
+            time_id,
+            time_nome_snapshot,
+            gols,
+            jogos_goleiro,
+            gols_sofridos,
+            pontos_time,
+            saldo_time,
+            gols_pro_time
+          `)
+          .eq("temporada_id", temporadaSelecionada.id),
+      ]);
 
-      let nomeGoleiro = "Não informado";
-      let golsSofridosGoleiro = 0;
-      let jogosGoleiro = 0;
+      if (erroTimesAtuais) throw erroTimesAtuais;
+      if (erroJogosAtuais) throw erroJogosAtuais;
+      if (erroEstatisticasMensais) throw erroEstatisticasMensais;
 
-      if (!campeonatoEncerrado) {
-        const [
-          { data: timesAtuais, error: erroTimesAtuais },
-          { data: jogosAtuais, error: erroJogosAtuais },
-          { data: jogadoresAtuais, error: erroJogadoresAtuais },
-        ] = await Promise.all([
-          supabase
-            .from("times")
-            .select("id, nome"),
-
-          supabase
-            .from("jogos_campeonato")
-            .select(
-              "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
-            )
-            .eq("temporada", anoSelecionado)
-            .eq("mes", mesSelecionado),
-
-          supabase
-            .from("jogadores")
-            .select(`
-              id,
-              nome,
-              gols,
-              jogos_goleiro,
-              gols_sofridos,
-              time_id,
-              times (
-                nome
-              )
-            `)
-            .eq("ativo", true),
-        ]);
-
-        if (erroTimesAtuais) throw erroTimesAtuais;
-        if (erroJogosAtuais) throw erroJogosAtuais;
-        if (erroJogadoresAtuais) throw erroJogadoresAtuais;
-
-        const classificacaoAtual =
-          calcularClassificacaoAtual(
-            timesAtuais || [],
-            jogosAtuais || []
-          );
-
-        const jogosEncerrados =
-          (jogosAtuais || []).filter(jogoEstaEncerrado);
-
-        if (jogosEncerrados.length > 0) {
-          campeaoAtual =
-            classificacaoAtual[0]?.nome || campeaoAtual;
-          viceAtual =
-            classificacaoAtual[1]?.nome || viceAtual;
-          terceiroAtual =
-            classificacaoAtual[2]?.nome || terceiroAtual;
-        }
-
-        const posicaoPorTime = new Map(
-          classificacaoAtual.map((time, indice) => [
-            Number(time.id),
-            indice + 1,
-          ])
+      const classificacaoAtual =
+        calcularClassificacaoAtual(
+          timesAtuais || [],
+          jogosAtuais || []
         );
 
-        const artilheirosOrdenados = (jogadoresAtuais || [])
-          .filter((jogador) => Number(jogador.gols || 0) > 0)
-          .map((jogador) => ({
-            id: Number(jogador.id),
-            nome: jogador.nome || "Não informado",
-            gols: Number(jogador.gols || 0),
-            timeId: Number(jogador.time_id),
+      const jogosEncerrados =
+        (jogosAtuais || []).filter(jogoEstaEncerrado);
+
+      const campeaoAtual =
+        jogosEncerrados.length > 0
+          ? classificacaoAtual[0]?.nome || "Não informado"
+          : "Não informado";
+
+      const viceAtual =
+        jogosEncerrados.length > 0
+          ? classificacaoAtual[1]?.nome || "Não informado"
+          : "Não informado";
+
+      const terceiroAtual =
+        jogosEncerrados.length > 0
+          ? classificacaoAtual[2]?.nome || "Não informado"
+          : "Não informado";
+
+      const posicaoPorTime = new Map(
+        classificacaoAtual.map((time, indice) => [
+          Number(time.id),
+          indice + 1,
+        ])
+      );
+
+      /*
+       * Artilharia e goleiros usam estatisticas_mensais.
+       * Assim a aba Campeões fica com a MESMA fonte já validada na aba
+       * Artilheiros, inclusive respeitando as correções de time por mês.
+       */
+      const artilheirosOrdenados = (estatisticasMensais || [])
+        .filter((registro) => Number(registro.gols || 0) > 0)
+        .map((registro) => ({
+          id: Number(registro.jogador_id),
+          nome:
+            registro.jogador_nome_snapshot ||
+            "Não informado",
+          gols: Number(registro.gols || 0),
+          timeId: Number(registro.time_id),
+          posicaoTime:
+            posicaoPorTime.get(Number(registro.time_id)) ??
+            Number.POSITIVE_INFINITY,
+        }))
+        .sort(
+          (a, b) =>
+            b.gols - a.gols ||
+            a.posicaoTime - b.posicaoTime ||
+            a.nome.localeCompare(b.nome, "pt-BR")
+        );
+
+      const goleirosOrdenados = (estatisticasMensais || [])
+        .filter(
+          (registro) =>
+            Number(registro.jogos_goleiro || 0) > 0
+        )
+        .map((registro) => {
+          const jogos = Number(registro.jogos_goleiro || 0);
+          const sofridos = Number(registro.gols_sofridos || 0);
+
+          return {
+            id: Number(registro.jogador_id),
+            nome:
+              registro.jogador_nome_snapshot ||
+              "Não informado",
+            jogos,
+            sofridos,
+            media:
+              jogos > 0
+                ? sofridos / jogos
+                : Number.POSITIVE_INFINITY,
+            timeId: Number(registro.time_id),
             posicaoTime:
-              posicaoPorTime.get(Number(jogador.time_id)) ??
+              posicaoPorTime.get(Number(registro.time_id)) ??
               Number.POSITIVE_INFINITY,
-          }))
-          .sort(
-            (a, b) =>
-              b.gols - a.gols ||
-              a.posicaoTime - b.posicaoTime ||
-              a.nome.localeCompare(b.nome, "pt-BR")
-          );
+          };
+        })
+        .sort(
+          (a, b) =>
+            a.media - b.media ||
+            a.sofridos - b.sofridos ||
+            b.jogos - a.jogos ||
+            a.posicaoTime - b.posicaoTime ||
+            a.nome.localeCompare(b.nome, "pt-BR")
+        );
 
-        const goleirosOrdenados = (jogadoresAtuais || [])
-          .filter(
-            (jogador) =>
-              Number(jogador.jogos_goleiro || 0) > 0
-          )
-          .map((jogador) => {
-            const jogos = Number(jogador.jogos_goleiro || 0);
-            const sofridos = Number(jogador.gols_sofridos || 0);
+      const artilheiroAtual = artilheirosOrdenados[0] || null;
+      const goleiroAtual = goleirosOrdenados[0] || null;
 
-            return {
-              id: Number(jogador.id),
-              nome: jogador.nome || "Não informado",
-              jogos,
-              sofridos,
-              media:
-                jogos > 0
-                  ? sofridos / jogos
-                  : Number.POSITIVE_INFINITY,
-              timeId: Number(jogador.time_id),
-              posicaoTime:
-                posicaoPorTime.get(Number(jogador.time_id)) ??
-                Number.POSITIVE_INFINITY,
-            };
-          })
-          .sort(
-            (a, b) =>
-              a.media - b.media ||
-              a.sofridos - b.sofridos ||
-              b.jogos - a.jogos ||
-              a.posicaoTime - b.posicaoTime ||
-              a.nome.localeCompare(b.nome, "pt-BR")
-          );
+      const itemVisual = {
+        // Se já houver linha salva, preserva o ID e as fotos.
+        // Se ainda não houver, cria apenas um ID visual provisório.
+        id:
+          itemSalvo?.id ??
+          `provisorio-${anoSelecionado}-${mesSelecionado}`,
+        mes: mesSelecionado,
+        ano: anoSelecionado,
+        provisorio: !itemSalvo,
 
-        const artilheiroAtual = artilheirosOrdenados[0] || null;
-        const goleiroAtual = goleirosOrdenados[0] || null;
-
-        if (artilheiroAtual) {
-          nomeArtilheiro = capitalizarNome(artilheiroAtual.nome);
-          golsArtilheiro = artilheiroAtual.gols;
-        }
-
-        if (goleiroAtual) {
-          nomeGoleiro = capitalizarNome(goleiroAtual.nome);
-          golsSofridosGoleiro = goleiroAtual.sofridos;
-          jogosGoleiro = goleiroAtual.jogos;
-        }
-      } else {
-        // CORREÇÃO: Lê os snapshots textuais e numéricos que gravamos de forma permanente
-        nomeArtilheiro = capitalizarNome(item.artilheiro_nome || "Não informado");
-        golsArtilheiro = Number(item.gols_artilheiro || 0);
-
-        nomeGoleiro = capitalizarNome(item.goleiro_nome || "Não informado");
-        golsSofridosGoleiro = Number(item.gols_sofridos_goleiro || 0);
-        jogosGoleiro = Number(item.jogos_goleiro || 0);
-      }
-
-      const dadosFormatados = [{
-        id: item.id,
-        mes: item.mes,
-        ano: item.ano,
         campeao: campeaoAtual,
         vice: viceAtual,
         terceiro: terceiroAtual,
-        artilheiro: nomeArtilheiro,
-        gols_artilheiro: golsArtilheiro,
-        goleiro: nomeGoleiro,
-        gols_sofridos_goleiro: golsSofridosGoleiro,
-        jogos_goleiro: jogosGoleiro,
-        foto_campeao_url: item.foto_campeao,
-        foto_vice_url: item.foto_vice,
-        foto_terceiro_url: item.foto_terceiro,
-        foto_artilheiro_url: item.foto_artilheiro,
-        foto_goleiro_url: item.foto_goleiro
-      }];
 
-      setHistorico(dadosFormatados);
+        artilheiro: artilheiroAtual
+          ? capitalizarNome(artilheiroAtual.nome)
+          : "Não informado",
+        gols_artilheiro: artilheiroAtual?.gols || 0,
+
+        goleiro: goleiroAtual
+          ? capitalizarNome(goleiroAtual.nome)
+          : "Não informado",
+        gols_sofridos_goleiro: goleiroAtual?.sofridos || 0,
+        jogos_goleiro: goleiroAtual?.jogos || 0,
+
+        foto_campeao_url: itemSalvo?.foto_campeao || null,
+        foto_vice_url: itemSalvo?.foto_vice || null,
+        foto_terceiro_url: itemSalvo?.foto_terceiro || null,
+        foto_artilheiro_url: itemSalvo?.foto_artilheiro || null,
+        foto_goleiro_url: itemSalvo?.foto_goleiro || null,
+      };
+
+      setHistorico([itemVisual]);
     } catch (erro) {
       console.error("Erro ao carregar campeões dinâmicos:", erro);
       setHistorico([]);
@@ -585,7 +626,8 @@ function Campeoes() {
             >
               <div style={{ marginBottom: "20px", borderBottom: "1px solid #25324a", paddingBottom: "12px" }}>
                 <span style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#facc15" }}>
-                  📅 Registro Oficial: {formatarMesExtenso(item.mes, item.ano)}
+                  {item.provisorio ? "📊 Acompanhamento Atual:" : "📅 Registro Oficial:"}{" "}
+                  {formatarMesExtenso(item.mes, item.ano)}
                 </span>
               </div>
 
@@ -607,7 +649,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#eab308", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🏆 1º LUGAR (CAMPEÃO)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.campeao}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
+                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
                   </div>
                 </div>
 
@@ -627,7 +669,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#94a3b8", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥈 2º LUGAR (VICE)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.vice}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
+                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
                   </div>
                 </div>
                 <div style={{ background: "#1e293b", border: "1px solid #cd7f32", borderRadius: "10px", overflow: "hidden" }}>
@@ -646,7 +688,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#cd7f32", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥉 3º LUGAR</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.terceiro}</h4>
-                    {isAdmin && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
+                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
                   </div>
                 </div>
 
@@ -678,7 +720,7 @@ function Campeoes() {
                     </div>
                   </div>
 
-                           {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_artilheiro" rotulo="Artilheiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_artilheiro_url} /></div>}
+                           {isAdmin && !item.provisorio && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_artilheiro" rotulo="Artilheiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_artilheiro_url} /></div>}
                 </div>
 
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
@@ -705,7 +747,7 @@ function Campeoes() {
                       <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>sofridos</span>
                     </div>
                   </div>
-                  {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_goleiro" rotulo="Melhor Goleiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_goleiro_url} /></div>}
+                  {isAdmin && !item.provisorio && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_goleiro" rotulo="Melhor Goleiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_goleiro_url} /></div>}
                 </div>
 
               </div>

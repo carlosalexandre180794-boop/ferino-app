@@ -39,7 +39,6 @@ function Estatisticas() {
     Number(localStorage.getItem(CHAVE_ANO) || 2026)
   );
 
-  // Alterado para useState comum para permitir a troca dinâmica de meses na tela
   const [mesAtivo, setMesAtivo] = useState(() =>
     Number(localStorage.getItem(CHAVE_MES) || 8)
   );
@@ -111,9 +110,9 @@ function Estatisticas() {
             Promise.resolve({
               data: [],
               error: null,
-            })
-          );
-        }
+                })
+              );
+            }
 
         const [
           respostaMensal,
@@ -124,30 +123,18 @@ function Estatisticas() {
         ] = await Promise.all(consultas);
 
         if (respostaMensal.error) throw respostaMensal.error;
-        if (respostaArtilhariaAnual.error) {
-          throw respostaArtilhariaAnual.error;
-        }
-        if (respostaGoleirosAnual.error) {
-          throw respostaGoleirosAnual.error;
-        }
-        if (respostaJogadoresAtuais.error) {
-          throw respostaJogadoresAtuais.error;
-        }
-        if (respostaTimesAtuais.error) {
-          throw respostaTimesAtuais.error;
-        }
+        if (respostaArtilhariaAnual.error) throw respostaArtilhariaAnual.error;
+        if (respostaGoleirosAnual.error) throw respostaGoleirosAnual.error;
+        if (respostaJogadoresAtuais.error) throw respostaJogadoresAtuais.error;
+        if (respostaTimesAtuais.error) throw respostaTimesAtuais.error;
 
         const classificacaoAtualPorTime = new Map(
           (respostaTimesAtuais.data || []).map((time) => [
             Number(time.id),
             {
               pontos: Number(time.pontos || 0),
-              saldo: Number(
-                time.saldo ?? time.saldo_gols ?? 0
-              ),
-              golsPro: Number(
-                time.gols_pro ?? time.gols_marcados ?? 0
-              ),
+              saldo: Number(time.saldo ?? time.saldo_gols ?? 0),
+              golsPro: Number(time.gols_pro ?? time.gols_marcados ?? 0),
             },
           ])
         );
@@ -165,30 +152,16 @@ function Estatisticas() {
         const listaMensalDoHistorico = snapshotMensal.map(
           (registro) => ({
             id: Number(registro.jogador_id),
-            nome:
-              registro.jogador_nome_snapshot ||
-              "Jogador não informado",
-            goleiro:
-              Number(registro.jogos_goleiro || 0) > 0,
-            time:
-              registro.time_nome_snapshot || "Sem time",
+            nome: registro.jogador_nome_snapshot || "Jogador não informado",
+            goleiro: Number(registro.jogos_goleiro || 0) > 0,
+            time: registro.time_nome_snapshot || "Sem time",
             gols: Number(registro.gols || 0),
             jogos: Number(registro.jogos || 0),
-            jogosGoleiro: Number(
-              registro.jogos_goleiro || 0
-            ),
-            golsSofridos: Number(
-              registro.gols_sofridos || 0
-            ),
-            pontosTime: Number(
-              registro.pontos_time || 0
-            ),
-            saldoTime: Number(
-              registro.saldo_time || 0
-            ),
-            golsProTime: Number(
-              registro.gols_pro_time || 0
-            ),
+            jogosGoleiro: Number(registro.jogos_goleiro || 0),
+            golsSofridos: Number(registro.gols_sofridos || 0),
+            pontosTime: Number(registro.pontos_time || 0),
+            saldoTime: Number(registro.saldo_time || 0),
+            golsProTime: Number(registro.gols_pro_time || 0),
           })
         );
 
@@ -196,30 +169,17 @@ function Estatisticas() {
           respostaJogadoresAtuais.data || []
         ).map((jogador) => {
           const classificacaoTime =
-            classificacaoAtualPorTime.get(
-              Number(jogador.time_id)
-            ) || {
-              pontos: 0,
-              saldo: 0,
-              golsPro: 0,
-            };
+            classificacaoAtualPorTime.get(Number(jogador.time_id)) || { pontos: 0, saldo: 0, golsPro: 0 };
 
           return {
             id: Number(jogador.id),
-            nome:
-              jogador.nome ||
-              "Jogador não informado",
+            nome: jogador.nome || "Jogador não informado",
             goleiro: Boolean(jogador.goleiro),
-            time:
-              jogador.times?.nome || "Sem time",
+            time: jogador.times?.nome || "Sem time",
             gols: Number(jogador.gols || 0),
             jogos: Number(jogador.jogos || 0),
-            jogosGoleiro: Number(
-              jogador.jogos_goleiro || 0
-            ),
-            golsSofridos: Number(
-              jogador.gols_sofridos || 0
-            ),
+            jogosGoleiro: Number(jogador.jogos_goleiro || 0),
+            golsSofridos: Number(jogador.gols_sofridos || 0),
             pontosTime: classificacaoTime.pontos,
             saldoTime: classificacaoTime.saldo,
             golsProTime: classificacaoTime.golsPro,
@@ -254,24 +214,12 @@ function Estatisticas() {
             nome: goleiro.nome,
             goleiro: true,
             time: goleiro.nome_time || "Sem time",
-            jogosGoleiro: Number(
-              goleiro.jogos_goleiro || 0
-            ),
-            golsSofridos: Number(
-              goleiro.gols_sofridos || 0
-            ),
-            pontosTime: Number(
-              goleiro.pontos_time || 0
-            ),
-            saldoTime: Number(
-              goleiro.saldo_time || 0
-            ),
-            golsProTime: Number(
-              goleiro.gols_pro_time || 0
-            ),
-            media: Number(
-              goleiro.media || 0
-            ).toFixed(2),
+            jogosGoleiro: Number(goleiro.jogos_goleiro || 0),
+            golsSofridos: Number(goleiro.gols_sofridos || 0),
+            pontosTime: Number(goleiro.pontos_time || 0),
+            saldoTime: Number(goleiro.saldo_time || 0),
+            golsProTime: Number(goleiro.gols_pro_time || 0),
+            media: Number(goleiro.media || 0).toFixed(2),
           }))
           .filter((goleiro) => goleiro.jogosGoleiro > 0);
 
@@ -284,25 +232,18 @@ function Estatisticas() {
           !selecionouPeriodoAtual
         ) {
           const nomeMes =
-            LISTA_MESES.find(
-              (item) => item.id === mesAtivo
-            )?.nome || "";
+            LISTA_MESES.find((item) => item.id === mesAtivo)?.nome || "";
 
           setMensagem(
             `Nenhum registro mensal foi encontrado para ${nomeMes} de ${anoAtivo}.`
           );
         }
       } catch (erro) {
-        console.error(
-          "Erro ao carregar estatísticas:",
-          erro
-        );
+        console.error("Erro ao carregar estatísticas:", erro);
         setJogadoresMensais([]);
         setArtilheirosAnuais([]);
         setGoleirosAnuais([]);
-        setMensagem(
-          `Erro ao carregar as estatísticas: ${erro.message}`
-        );
+        setMensagem(`Erro ao carregar as estatísticas: ${erro.message}`);
       } finally {
         setCarregando(false);
       }
@@ -310,22 +251,21 @@ function Estatisticas() {
 
     carregarEstatisticas();
   }, [anoAtivo, mesAtivo]);
-
   // CORREÇÃO: Removido o !jogador.goleiro para permitir goleiros marcarem gols na artilharia geral
   const artilheirosMensais = useMemo(
-  () =>
-    [...jogadoresMensais]
-      .filter((jogador) => jogador.gols > 0)
-      .sort(
-        (a, b) =>
-          b.gols - a.gols ||
-          b.pontosTime - a.pontosTime ||
-          b.saldoTime - a.saldoTime ||
-          b.golsProTime - a.golsProTime ||
-          a.nome.localeCompare(b.nome, "pt-BR")
-      ),
-  [jogadoresMensais]
-);
+    () =>
+      [...jogadoresMensais]
+        .filter((jogador) => jogador.gols > 0)
+        .sort(
+          (a, b) =>
+            b.gols - a.gols ||
+            b.pontosTime - a.pontosTime ||
+            b.saldoTime - a.saldoTime ||
+            b.golsProTime - a.golsProTime ||
+            a.nome.localeCompare(b.nome, "pt-BR")
+        ),
+    [jogadoresMensais]
+  );
 
   const artilheirosExibidos =
     filtroArtilharia === "mes"
@@ -563,8 +503,6 @@ function Estatisticas() {
     </main>
   );
 }
-
-
 
 function CabecalhoRanking({
   titulo,
