@@ -177,6 +177,11 @@ function Campeoes() {
           campeao: itemSalvo.campeao?.nome || "Não informado",
           vice: itemSalvo.vice?.nome || "Não informado",
           terceiro: itemSalvo.terceiro?.nome || "Não informado",
+          campeao_id: itemSalvo.campeao?.id ?? null,
+          vice_id: itemSalvo.vice?.id ?? null,
+          terceiro_id: itemSalvo.terceiro?.id ?? null,
+          artilheiro_id: itemSalvo.artilheiro_id ?? null,
+          goleiro_id: itemSalvo.goleiro_id ?? null,
           artilheiro: capitalizarNome(
             itemSalvo.artilheiro_nome || "Não informado"
           ),
@@ -208,6 +213,7 @@ function Campeoes() {
         { data: timesAtuais, error: erroTimesAtuais },
         { data: jogosAtuais, error: erroJogosAtuais },
         { data: estatisticasMensais, error: erroEstatisticasMensais },
+        { data: goleirosMensais, error: erroGoleirosMensais },
       ] = await Promise.all([
         supabase
           .from("times")
@@ -236,11 +242,17 @@ function Campeoes() {
             gols_pro_time
           `)
           .eq("temporada_id", temporadaSelecionada.id),
+
+        supabase.rpc("goleiros_mensal", {
+          p_ano: anoSelecionado,
+          p_mes: mesSelecionado,
+        }),
       ]);
 
       if (erroTimesAtuais) throw erroTimesAtuais;
       if (erroJogosAtuais) throw erroJogosAtuais;
       if (erroEstatisticasMensais) throw erroEstatisticasMensais;
+      if (erroGoleirosMensais) throw erroGoleirosMensais;
 
       const classificacaoAtual =
         calcularClassificacaoAtual(
@@ -298,40 +310,16 @@ function Campeoes() {
             a.nome.localeCompare(b.nome, "pt-BR")
         );
 
-      const goleirosOrdenados = (estatisticasMensais || [])
-        .filter(
-          (registro) =>
-            Number(registro.jogos_goleiro || 0) > 0
-        )
-        .map((registro) => {
-          const jogos = Number(registro.jogos_goleiro || 0);
-          const sofridos = Number(registro.gols_sofridos || 0);
-
-          return {
-            id: Number(registro.jogador_id),
-            nome:
-              registro.jogador_nome_snapshot ||
-              "Não informado",
-            jogos,
-            sofridos,
-            media:
-              jogos > 0
-                ? sofridos / jogos
-                : Number.POSITIVE_INFINITY,
-            timeId: Number(registro.time_id),
-            posicaoTime:
-              posicaoPorTime.get(Number(registro.time_id)) ??
-              Number.POSITIVE_INFINITY,
-          };
-        })
-        .sort(
-          (a, b) =>
-            a.media - b.media ||
-            a.sofridos - b.sofridos ||
-            b.jogos - a.jogos ||
-            a.posicaoTime - b.posicaoTime ||
-            a.nome.localeCompare(b.nome, "pt-BR")
-        );
+      const goleirosOrdenados = (goleirosMensais || [])
+        .map((goleiro) => ({
+          id: Number(goleiro.id),
+          nome: goleiro.nome || "Não informado",
+          jogos: Number(goleiro.jogos_goleiro || 0),
+          sofridos: Number(goleiro.gols_sofridos || 0),
+          media: Number(goleiro.media || 0),
+          timeNome: goleiro.nome_time || "Sem time",
+        }))
+        .filter((goleiro) => goleiro.jogos > 0);
 
       const artilheiroAtual = artilheirosOrdenados[0] || null;
       const goleiroAtual = goleirosOrdenados[0] || null;
@@ -350,11 +338,23 @@ function Campeoes() {
         vice: viceAtual,
         terceiro: terceiroAtual,
 
+        campeao_id: classificacaoAtual[0]?.id ?? null,
+        vice_id: classificacaoAtual[1]?.id ?? null,
+        terceiro_id: classificacaoAtual[2]?.id ?? null,
+
+        artilheiro_id: artilheiroAtual?.id ?? null,
+        artilheiro_time:
+          timesAtuais?.find(
+            (time) => Number(time.id) === Number(artilheiroAtual?.timeId)
+          )?.nome || "Sem time",
         artilheiro: artilheiroAtual
           ? capitalizarNome(artilheiroAtual.nome)
           : "Não informado",
         gols_artilheiro: artilheiroAtual?.gols || 0,
 
+        goleiro_id: goleiroAtual?.id ?? null,
+        goleiro_time:
+          goleiroAtual?.timeNome || "Sem time",
         goleiro: goleiroAtual
           ? capitalizarNome(goleiroAtual.nome)
           : "Não informado",
@@ -401,6 +401,61 @@ function Campeoes() {
     return `${nomeMes} de ${anoNum}`;
   }
 
+  async function garantirRegistroParaFotos(item) {
+    if (!item?.provisorio && Number.isFinite(Number(item?.id))) {
+      return Number(item.id);
+    }
+
+    const { data: existente, error: erroBusca } = await supabase
+      .from("campeoes_mensais")
+      .select("id")
+      .eq("ano", Number(item.ano))
+      .eq("mes", Number(item.mes))
+      .maybeSingle();
+
+    if (erroBusca) throw erroBusca;
+
+    if (existente?.id) {
+      return Number(existente.id);
+    }
+
+    const jogosGoleiro = Number(item.jogos_goleiro || 0);
+    const golsSofridos = Number(item.gols_sofridos_goleiro || 0);
+    const mediaGoleiro =
+      jogosGoleiro > 0 ? golsSofridos / jogosGoleiro : null;
+
+    const novoRegistro = {
+      ano: Number(item.ano),
+      mes: Number(item.mes),
+      campeao_time_id: item.campeao_id ?? null,
+      vice_time_id: item.vice_id ?? null,
+      terceiro_time_id: item.terceiro_id ?? null,
+      artilheiro_jogador_id: item.artilheiro_id ?? null,
+      goleiro_jogador_id: item.goleiro_id ?? null,
+      campeao_nome: item.campeao || "Não informado",
+      vice_nome: item.vice || "Não informado",
+      terceiro_nome: item.terceiro || "Não informado",
+      artilheiro_nome: item.artilheiro || "Não informado",
+      artilheiro_time: item.artilheiro_time || "Sem time",
+      gols_artilheiro: Number(item.gols_artilheiro || 0),
+      goleiro_nome: item.goleiro || "Não informado",
+      goleiro_time: item.goleiro_time || "Sem time",
+      jogos_goleiro: jogosGoleiro,
+      gols_sofridos_goleiro: golsSofridos,
+      media_goleiro: mediaGoleiro,
+    };
+
+    const { data: criado, error: erroCriacao } = await supabase
+      .from("campeoes_mensais")
+      .insert(novoRegistro)
+      .select("id")
+      .single();
+
+    if (erroCriacao) throw erroCriacao;
+
+    return Number(criado.id);
+  }
+
   async function enviarFoto(item, arquivo, colunaFoto) {
     if (!arquivo) return;
 
@@ -422,8 +477,10 @@ function Campeoes() {
     setMensagem("");
 
     try {
+      const registroId = await garantirRegistroParaFotos(item);
+
       const extensao = arquivo.name.split(".").pop()?.toLowerCase() || "jpg";
-      const nomeArquivo = `${colunaFoto}_${item.id}_${Date.now()}.${extensao}`;
+      const nomeArquivo = `${colunaFoto}_${registroId}_${Date.now()}.${extensao}`;
 
       const { error: erroUpload } = await supabase.storage
         .from("fotos-campeonatos")
@@ -450,7 +507,7 @@ function Campeoes() {
       const { error: erroAtualizacao } = await supabase
         .from("campeoes_mensais")
         .update(camposAtualizar)
-        .eq("id", item.id);
+        .eq("id", registroId);
 
       if (erroAtualizacao) throw erroAtualizacao;
 
@@ -475,13 +532,15 @@ function Campeoes() {
     setMensagem("");
 
     try {
+      const registroId = await garantirRegistroParaFotos(item);
+
       const camposAtualizar = {};
       camposAtualizar[colunaFoto] = null;
 
       const { error } = await supabase
         .from("campeoes_mensais")
         .update(camposAtualizar)
-        .eq("id", item.id);
+        .eq("id", registroId);
 
       if (error) throw error;
 
@@ -649,7 +708,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#eab308", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🏆 1º LUGAR (CAMPEÃO)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.campeao}</h4>
-                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_campeao" rotulo="Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_campeao_url} />}
                   </div>
                 </div>
 
@@ -669,7 +728,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#94a3b8", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥈 2º LUGAR (VICE)</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.vice}</h4>
-                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_vice" rotulo="Vice-Campeão" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_vice_url} />}
                   </div>
                 </div>
                 <div style={{ background: "#1e293b", border: "1px solid #cd7f32", borderRadius: "10px", overflow: "hidden" }}>
@@ -688,7 +747,7 @@ function Campeoes() {
                   <div style={{ padding: "16px" }}>
                     <span style={{ color: "#cd7f32", fontWeight: "bold", display: "block", marginBottom: "4px" }}>🥉 3º LUGAR</span>
                     <h4 style={{ margin: 0, color: "#fff", fontSize: "1.4rem" }}>{item.terceiro}</h4>
-                    {isAdmin && !item.provisorio && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
+                    {isAdmin && <SeletorFoto item={item} coluna="foto_terceiro" rotulo="3º Colocado" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_terceiro_url} />}
                   </div>
                 </div>
 
@@ -720,7 +779,7 @@ function Campeoes() {
                     </div>
                   </div>
 
-                           {isAdmin && !item.provisorio && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_artilheiro" rotulo="Artilheiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_artilheiro_url} /></div>}
+                           {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_artilheiro" rotulo="Artilheiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_artilheiro_url} /></div>}
                 </div>
 
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
@@ -747,7 +806,7 @@ function Campeoes() {
                       <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>sofridos</span>
                     </div>
                   </div>
-                  {isAdmin && !item.provisorio && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_goleiro" rotulo="Melhor Goleiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_goleiro_url} /></div>}
+                  {isAdmin && <div style={{ padding: "0 16px 16px 16px" }}><SeletorFoto item={item} coluna="foto_goleiro" rotulo="Melhor Goleiro" uploadEmAndamento={uploadEmAndamento} enviarFoto={enviarFoto} removerFoto={removerFoto} url={item.foto_goleiro_url} /></div>}
                 </div>
 
               </div>

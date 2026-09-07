@@ -12,10 +12,17 @@ function capitalizarNome(nome = "") {
     );
 }
 function Home() {
+  const anoAtivo = Number(
+    localStorage.getItem("ferino_ano_ativo") || new Date().getFullYear()
+  );
+  const mesAtivo = Number(
+    localStorage.getItem("ferino_mes_ativo") || (new Date().getMonth() + 1)
+  );
+
   const [dados, setDados] = useState({
     lider: null,
     vice: null,
-    terceiro: null,
+    lanterna: null,
     artilheiro: null,
     melhorGoleiro: null,
     jogosEncerrados: 0,
@@ -27,105 +34,88 @@ function Home() {
 
   useEffect(() => {
     async function carregarPainel() {
-      setCarregando(true);
-
       try {
-        const agora = new Date();
-        const anoAtual = agora.getFullYear();
-        const mesAtual = agora.getMonth() + 1;
-
-        const { data: temporadaAtual, error: erroTemporada } = await supabase
+        // Busca a temporada selecionada para que classificação e artilharia
+        // sejam sempre do mês ativo, sem usar os totais acumulados de `times`
+        // e `jogadores`.
+        const { data: temporada, error: erroTemporada } = await supabase
           .from("temporadas")
-          .select("id, ano, mes, status")
-          .eq("ano", anoAtual)
-          .eq("mes", mesAtual)
+          .select("id")
+          .eq("ano", anoAtivo)
+          .eq("mes", mesAtivo)
           .maybeSingle();
 
         if (erroTemporada) throw erroTemporada;
 
-        if (!temporadaAtual) {
-          setDados({
-            lider: null,
-            vice: null,
-            terceiro: null,
-            artilheiro: null,
-            melhorGoleiro: null,
-            jogosEncerrados: 0,
-            totalGols: 0,
-            mediaGols: "0.0",
-          });
-          return;
-        }
+        const consultaMensal = temporada?.id
+          ? supabase
+              .from("estatisticas_mensais")
+              .select(`
+                jogador_id,
+                jogador_nome_snapshot,
+                time_nome_snapshot,
+                gols,
+                pontos_time,
+                saldo_time,
+                gols_pro_time
+              `)
+              .eq("temporada_id", temporada.id)
+          : Promise.resolve({ data: [], error: null });
 
-        const [resTimes, resJogos, resEstatisticas, resPartidasAcumuladas] = await Promise.all([
+        const [
+          resMensal,
+          resGoleiros,
+          resPartidas,
+          resTimesMes,
+          resJogosMes,
+        ] = await Promise.all([
+          consultaMensal,
+          supabase.rpc("goleiros_mensal", {
+            p_ano: anoAtivo,
+            p_mes: mesAtivo,
+          }),
+          supabase.from("partidas").select("gols_a, gols_b"),
           supabase
             .from("times")
-            .select("id, nome"),
-
+            .select("id, nome")
+            .order("nome", { ascending: true }),
           supabase
             .from("jogos_campeonato")
-            .select(`
-              id,
-              time_a_id,
-              time_b_id,
-              gols_a,
-              gols_b,
-              status,
-              partida_id
-            `)
-            .eq("temporada", anoAtual)
-            .eq("mes", mesAtual),
-
-          supabase
-            .from("estatisticas_mensais")
-            .select(`
-              id,
-              jogador_id,
-              time_id,
-              jogador_nome_snapshot,
-              time_nome_snapshot,
-              gols,
-              jogos_goleiro,
-              gols_sofridos
-            `)
-            .eq("temporada_id", temporadaAtual.id),
-
-          // Resumo geral do projeto: mantém o acumulado de todas as partidas
-          // já registradas, como o painel mostrava antes.
-          supabase
-            .from("partidas")
-            .select("gols_a, gols_b"),
+            .select(
+              "id, temporada, mes, time_a_id, time_b_id, gols_a, gols_b, status, partida_id"
+            )
+            .eq("temporada", anoAtivo)
+            .eq("mes", mesAtivo),
         ]);
 
-        if (resTimes.error) throw resTimes.error;
-        if (resJogos.error) throw resJogos.error;
-        if (resEstatisticas.error) throw resEstatisticas.error;
-        if (resPartidasAcumuladas.error) throw resPartidasAcumuladas.error;
+        if (resMensal.error) throw resMensal.error;
+        if (resGoleiros.error) throw resGoleiros.error;
+        if (resPartidas.error) throw resPartidas.error;
+        if (resTimesMes.error) throw resTimesMes.error;
+        if (resJogosMes.error) throw resJogosMes.error;
 
-        const timesBase = resTimes.data || [];
-        const jogosDoMes = resJogos.data || [];
-        const estatisticasDoMes = resEstatisticas.data || [];
-        const partidasAcumuladas = resPartidasAcumuladas.data || [];
+        const mensais = resMensal.data || [];
 
-        const mapaTimes = new Map(
-          timesBase.map((time) => [
-            Number(time.id),
-            {
-              id: Number(time.id),
-              nome: time.nome,
-              pontos: 0,
-              jogos: 0,
-              vitorias: 0,
-              empates: 0,
-              derrotas: 0,
-              gols_pro: 0,
-              gols_contra: 0,
-              saldo: 0,
-            },
-          ])
-        );
+        // Mesma regra da tela Tabela: classificação calculada somente
+        // pelas partidas encerradas de jogos_campeonato no mês ativo.
+        const mapaTimes = new Map();
 
-        function jogoEncerrado(jogo) {
+        (resTimesMes.data || []).forEach((time) => {
+          mapaTimes.set(Number(time.id), {
+            id: Number(time.id),
+            nome: time.nome,
+            pontos: 0,
+            jogos: 0,
+            vitorias: 0,
+            empates: 0,
+            derrotas: 0,
+            gols_pro: 0,
+            gols_contra: 0,
+            saldo: 0,
+          });
+        });
+
+        const jogoEstaEncerrado = (jogo) => {
           const status = String(jogo.status || "").toLowerCase();
 
           return (
@@ -135,47 +125,48 @@ function Home() {
             status === "finalizada" ||
             jogo.partida_id !== null
           );
-        }
+        };
 
-        const jogosEncerrados = jogosDoMes.filter(jogoEncerrado);
+        (resJogosMes.data || [])
+          .filter(jogoEstaEncerrado)
+          .forEach((jogo) => {
+            const timeA = mapaTimes.get(Number(jogo.time_a_id));
+            const timeB = mapaTimes.get(Number(jogo.time_b_id));
 
-        jogosEncerrados.forEach((jogo) => {
-          const timeA = mapaTimes.get(Number(jogo.time_a_id));
-          const timeB = mapaTimes.get(Number(jogo.time_b_id));
+            if (!timeA || !timeB) return;
 
-          if (!timeA || !timeB) return;
+            const golsA = Number(jogo.gols_a ?? 0);
+            const golsB = Number(jogo.gols_b ?? 0);
 
-          const golsA = Number(jogo.gols_a ?? 0);
-          const golsB = Number(jogo.gols_b ?? 0);
+            timeA.jogos += 1;
+            timeB.jogos += 1;
 
-          timeA.jogos += 1;
-          timeB.jogos += 1;
+            timeA.gols_pro += golsA;
+            timeA.gols_contra += golsB;
 
-          timeA.gols_pro += golsA;
-          timeA.gols_contra += golsB;
-          timeB.gols_pro += golsB;
-          timeB.gols_contra += golsA;
+            timeB.gols_pro += golsB;
+            timeB.gols_contra += golsA;
 
-          if (golsA > golsB) {
-            timeA.pontos += 3;
-            timeA.vitorias += 1;
-            timeB.derrotas += 1;
-          } else if (golsB > golsA) {
-            timeB.pontos += 3;
-            timeB.vitorias += 1;
-            timeA.derrotas += 1;
-          } else {
-            timeA.pontos += 1;
-            timeB.pontos += 1;
-            timeA.empates += 1;
-            timeB.empates += 1;
-          }
-        });
+            if (golsA > golsB) {
+              timeA.vitorias += 1;
+              timeA.pontos += 3;
+              timeB.derrotas += 1;
+            } else if (golsB > golsA) {
+              timeB.vitorias += 1;
+              timeB.pontos += 3;
+              timeA.derrotas += 1;
+            } else {
+              timeA.empates += 1;
+              timeB.empates += 1;
+              timeA.pontos += 1;
+              timeB.pontos += 1;
+            }
+          });
 
-        const classificacao = Array.from(mapaTimes.values())
+        const times = Array.from(mapaTimes.values())
           .map((time) => ({
             ...time,
-            saldo: time.gols_pro - time.gols_contra,
+            saldo: Number(time.gols_pro) - Number(time.gols_contra),
           }))
           .sort(
             (a, b) =>
@@ -189,78 +180,72 @@ function Home() {
               )
           );
 
-        const posicaoPorTime = new Map(
-          classificacao.map((time, indice) => [
-            Number(time.id),
-            indice + 1,
-          ])
-        );
-
-        const artilheirosOrdenados = estatisticasDoMes
-          .filter((item) => Number(item.gols || 0) > 0)
-          .map((item) => ({
-            id: Number(item.jogador_id),
-            nome: item.jogador_nome_snapshot || "Não informado",
-            gols: Number(item.gols || 0),
-            time_id: Number(item.time_id),
-            time_nome: item.time_nome_snapshot || "",
-            posicaoTime:
-              posicaoPorTime.get(Number(item.time_id)) ??
-              Number.POSITIVE_INFINITY,
+        const artilheirosOrdenados = mensais
+          .map((registro) => ({
+            id: Number(registro.jogador_id),
+            nome: registro.jogador_nome_snapshot || "Jogador não informado",
+            gols: Number(registro.gols || 0),
+            pontosTime: Number(registro.pontos_time || 0),
+            saldoTime: Number(registro.saldo_time || 0),
+            golsProTime: Number(registro.gols_pro_time || 0),
+            times: {
+              nome: registro.time_nome_snapshot || "Sem time",
+            },
           }))
+          .filter((jogador) => jogador.gols > 0)
           .sort(
             (a, b) =>
               b.gols - a.gols ||
-              a.posicaoTime - b.posicaoTime ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
           );
 
-        const goleirosOrdenados = estatisticasDoMes
-          .filter((item) => Number(item.jogos_goleiro || 0) > 0)
-          .map((item) => {
-            const jogos = Number(item.jogos_goleiro || 0);
-            const sofridos = Number(item.gols_sofridos || 0);
+        const goleirosOrdenados = (resGoleiros.data || [])
+          .map((goleiro) => ({
+            ...goleiro,
+            gols_sofridos: Number(goleiro.gols_sofridos || 0),
+            jogos_goleiro: Number(goleiro.jogos_goleiro || 0),
+            pontosTime: Number(goleiro.pontos_time || 0),
+            saldoTime: Number(goleiro.saldo_time || 0),
+            golsProTime: Number(goleiro.gols_pro_time || 0),
+            times: {
+              nome: goleiro.nome_time || "Sem time",
+            },
+          }))
+          .filter((goleiro) => goleiro.jogos_goleiro > 0)
+          .sort((a, b) => {
+            const mediaA = a.gols_sofridos / a.jogos_goleiro;
+            const mediaB = b.gols_sofridos / b.jogos_goleiro;
 
-            return {
-              id: Number(item.jogador_id),
-              nome: item.jogador_nome_snapshot || "Não informado",
-              jogos_goleiro: jogos,
-              gols_sofridos: sofridos,
-              time_id: Number(item.time_id),
-              time_nome: item.time_nome_snapshot || "",
-              media:
-                jogos > 0
-                  ? sofridos / jogos
-                  : Number.POSITIVE_INFINITY,
-              posicaoTime:
-                posicaoPorTime.get(Number(item.time_id)) ??
-                Number.POSITIVE_INFINITY,
-            };
-          })
-          .sort(
-            (a, b) =>
-              a.media - b.media ||
+            return (
+              mediaA - mediaB ||
               a.gols_sofridos - b.gols_sofridos ||
               b.jogos_goleiro - a.jogos_goleiro ||
-              a.posicaoTime - b.posicaoTime ||
+              b.pontosTime - a.pontosTime ||
+              b.saldoTime - a.saldoTime ||
+              b.golsProTime - a.golsProTime ||
               a.nome.localeCompare(b.nome, "pt-BR")
-          );
+            );
+          });
 
-        // Os destaques acima são mensais, mas estes 3 números são acumulados.
-        const somaGols = partidasAcumuladas.reduce(
+        const partidas = resPartidas.data || [];
+        const somaGols = partidas.reduce(
           (total, partida) =>
             total +
-            Number(partida.gols_a ?? 0) +
-            Number(partida.gols_b ?? 0),
+            Number(partida.gols_a || 0) +
+            Number(partida.gols_b || 0),
           0
         );
 
-        const quantidadeJogos = partidasAcumuladas.length;
+        const quantidadeJogos = partidas.length;
 
         setDados({
-          lider: classificacao[0] || null,
-          vice: classificacao[1] || null,
-          terceiro: classificacao[2] || null,
+          lider: times[0] || null,
+          vice: times[1] || null,
+          // IMPORTANTE: o terceiro card é o LANTERNA, sempre o último colocado.
+          lanterna: times.length > 0 ? times[times.length - 1] : null,
           artilheiro: artilheirosOrdenados[0] || null,
           melhorGoleiro: goleirosOrdenados[0] || null,
           jogosEncerrados: quantidadeJogos,
@@ -271,14 +256,14 @@ function Home() {
               : "0.0",
         });
       } catch (error) {
-        console.error("Erro ao carregar painel mensal:", error);
+        console.error("Erro ao carregar painel:", error);
       } finally {
         setCarregando(false);
       }
     }
 
     carregarPainel();
-  }, []);
+  }, [anoAtivo, mesAtivo]);
 
   if (carregando) {
     return (
@@ -288,8 +273,8 @@ function Home() {
     );
   }
 
-  const nomeTimeArtilheiro = dados.artilheiro?.time_nome || "";
-  const nomeTimeGoleiro = dados.melhorGoleiro?.time_nome || "";
+  const nomeTimeArtilheiro = dados.artilheiro?.times?.nome || "";
+  const nomeTimeGoleiro = dados.melhorGoleiro?.times?.nome || "";
 
   const mediaGoleiro =
     dados.melhorGoleiro?.jogos_goleiro > 0
@@ -647,21 +632,21 @@ function Home() {
           <article className="highlight-card lantern-card">
             <div className="highlight-title">
               <span className="highlight-icon">🔻</span>
-              <strong>3º lugar</strong>
+              <strong>Lanterna</strong>
             </div>
 
-            {dados.terceiro ? (
+            {dados.lanterna ? (
               <div className="highlight-person">
                 <img
-                  src={escudoDoTime(dados.terceiro)}
-                  alt={`Escudo do ${dados.terceiro.nome}`}
+                  src={escudoDoTime(dados.lanterna)}
+                  alt={`Escudo do ${dados.lanterna.nome}`}
                   className="home-highlight-shield"
                   decoding="async"
                 />
 
                 <div>
-                  <h2>{dados.terceiro.nome}</h2>
-                  <p>{dados.terceiro.pontos ?? 0} pontos</p>
+                  <h2>{dados.lanterna.nome}</h2>
+                  <p>{dados.lanterna.pontos ?? 0} pontos</p>
                 </div>
               </div>
             ) : (

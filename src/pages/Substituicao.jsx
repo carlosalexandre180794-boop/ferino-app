@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
+import AdminLogin from "../components/AdminLogin";
+import { adminEstaAtivo, desativarModoAdmin } from "../auth/adminAuth";
 
 const SUBSTITUICAO_MENSAL_V2 = "2026-08-05-v2";
 
@@ -28,8 +30,7 @@ const ANOS = Array.from(
 function Substituicao() {
   const agora = new Date();
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [senhaDigitada, setSenhaDigitada] = useState("");
+  const [isAdmin, setIsAdmin] = useState(adminEstaAtivo());
 
   const [anoSelecionado, setAnoSelecionado] = useState(
     Math.max(ANO_INICIAL, agora.getFullYear())
@@ -190,21 +191,6 @@ function Substituicao() {
     [elencos, timeSelecionado]
   );
 
-  function verificarSenhaAdmin(evento) {
-    evento.preventDefault();
-
-    if (senhaDigitada === "ferino2026") {
-      setIsAdmin(true);
-      setSenhaDigitada("");
-      setMensagem("");
-      return;
-    }
-
-    alert(
-      "Acesso negado! Apenas administradores podem fazer substituições."
-    );
-  }
-
   async function realizarSubstituicao(evento) {
     evento.preventDefault();
     setMensagem("");
@@ -306,81 +292,16 @@ function Substituicao() {
     return (
       <main
         className="page"
-        style={{
-          padding: "20px",
-          textAlign: "center",
-          color: "#fff",
-        }}
+        style={{ padding: "20px", color: "#fff" }}
       >
-        <section
-          className="page-header"
-          style={{ marginBottom: "16px" }}
-        >
-          <h2 style={{ margin: 0, fontSize: "1.7rem" }}>
-            Substituição
-          </h2>
-        </section>
-
-        <form
-          onSubmit={verificarSenhaAdmin}
-          style={{
-            background: "#1e1e24",
-            padding: "20px",
-            borderRadius: "8px",
-            maxWidth: "400px",
-            margin: "0 auto",
-            border: "1px solid #333",
+        <AdminLogin
+          titulo="Substituição"
+          descricao="Acesse a área administrativa para registrar substituições temporárias."
+          onLiberado={() => {
+            setIsAdmin(true);
+            setMensagem("");
           }}
-        >
-          <label
-            htmlFor="senha-admin"
-            style={{
-              display: "block",
-              color: "#aaa",
-              marginBottom: "10px",
-            }}
-          >
-            Digite a senha de administrador
-          </label>
-
-          <input
-            id="senha-admin"
-            type="password"
-            placeholder="Senha..."
-            value={senhaDigitada}
-            onChange={(evento) =>
-              setSenhaDigitada(evento.target.value)
-            }
-            autoComplete="current-password"
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              background: "#2a2a32",
-              border: "1px solid #444",
-              color: "#fff",
-              borderRadius: "4px",
-              marginBottom: "14px",
-              boxSizing: "border-box",
-              textAlign: "center",
-            }}
-          />
-
-          <button
-            type="submit"
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              background: "#4f46e5",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Entrar
-          </button>
-        </form>
+        />
       </main>
     );
   }
@@ -458,7 +379,11 @@ function Substituicao() {
 
         <button
           type="button"
-          onClick={() => setIsAdmin(false)}
+          onClick={() => {
+            desativarModoAdmin();
+            setIsAdmin(false);
+            setMensagem("");
+          }}
           style={{
             padding: "6px 10px",
             background: "transparent",

@@ -29,6 +29,7 @@ function Estatisticas() {
   const [jogadoresMensais, setJogadoresMensais] = useState([]);
   const [artilheirosAnuais, setArtilheirosAnuais] = useState([]);
   const [goleirosAnuais, setGoleirosAnuais] = useState([]);
+  const [goleirosMensaisRpc, setGoleirosMensaisRpc] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState("");
 
@@ -64,6 +65,10 @@ function Estatisticas() {
           }),
           supabase.rpc("goleiros_anual", {
             p_ano: anoAtivo,
+          }),
+          supabase.rpc("goleiros_mensal", {
+            p_ano: anoAtivo,
+            p_mes: mesAtivo,
           }),
           supabase
             .from("jogadores")
@@ -118,6 +123,7 @@ function Estatisticas() {
           respostaMensal,
           respostaArtilhariaAnual,
           respostaGoleirosAnual,
+          respostaGoleirosMensal,
           respostaJogadoresAtuais,
           respostaTimesAtuais,
         ] = await Promise.all(consultas);
@@ -125,6 +131,7 @@ function Estatisticas() {
         if (respostaMensal.error) throw respostaMensal.error;
         if (respostaArtilhariaAnual.error) throw respostaArtilhariaAnual.error;
         if (respostaGoleirosAnual.error) throw respostaGoleirosAnual.error;
+        if (respostaGoleirosMensal.error) throw respostaGoleirosMensal.error;
         if (respostaJogadoresAtuais.error) throw respostaJogadoresAtuais.error;
         if (respostaTimesAtuais.error) throw respostaTimesAtuais.error;
 
@@ -206,6 +213,23 @@ function Estatisticas() {
           }))
           .filter((jogador) => jogador.gols > 0);
 
+        const listaGoleirosMensalRpc = (
+          respostaGoleirosMensal.data || []
+        )
+          .map((goleiro) => ({
+            id: Number(goleiro.id),
+            nome: goleiro.nome,
+            goleiro: true,
+            time: goleiro.nome_time || "Sem time",
+            jogosGoleiro: Number(goleiro.jogos_goleiro || 0),
+            golsSofridos: Number(goleiro.gols_sofridos || 0),
+            pontosTime: Number(goleiro.pontos_time || 0),
+            saldoTime: Number(goleiro.saldo_time || 0),
+            golsProTime: Number(goleiro.gols_pro_time || 0),
+            media: Number(goleiro.media || 0).toFixed(2),
+          }))
+          .filter((goleiro) => goleiro.jogosGoleiro > 0);
+
         const listaGoleirosAnual = (
           respostaGoleirosAnual.data || []
         )
@@ -225,6 +249,7 @@ function Estatisticas() {
 
         setJogadoresMensais(listaMensal);
         setArtilheirosAnuais(listaArtilhariaAnual);
+        setGoleirosMensaisRpc(listaGoleirosMensalRpc);
         setGoleirosAnuais(listaGoleirosAnual);
 
         if (
@@ -242,6 +267,7 @@ function Estatisticas() {
         console.error("Erro ao carregar estatísticas:", erro);
         setJogadoresMensais([]);
         setArtilheirosAnuais([]);
+        setGoleirosMensaisRpc([]);
         setGoleirosAnuais([]);
         setMensagem(`Erro ao carregar as estatísticas: ${erro.message}`);
       } finally {
@@ -273,38 +299,8 @@ function Estatisticas() {
       : artilheirosAnuais;
 
   const goleirosMensais = useMemo(
-    () =>
-      jogadoresMensais
-        .filter((jogador) => jogador.goleiro)
-        .map((goleiro) => ({
-          ...goleiro,
-          media:
-            goleiro.jogosGoleiro > 0
-              ? (goleiro.golsSofridos / goleiro.jogosGoleiro).toFixed(2)
-              : "0.00",
-        }))
-        .sort((a, b) => {
-          if (a.jogosGoleiro > 0 && b.jogosGoleiro === 0) return -1;
-          if (a.jogosGoleiro === 0 && b.jogosGoleiro > 0) return 1;
-
-          if (a.jogosGoleiro > 0 && b.jogosGoleiro > 0) {
-            const mediaA = a.golsSofridos / a.jogosGoleiro;
-            const mediaB = b.golsSofridos / b.jogosGoleiro;
-
-            return (
-              mediaA - mediaB ||
-              a.golsSofridos - b.golsSofridos ||
-              b.jogosGoleiro - a.jogosGoleiro ||
-              b.pontosTime - a.pontosTime ||
-              b.saldoTime - a.saldoTime ||
-              b.golsProTime - a.golsProTime ||
-              a.nome.localeCompare(b.nome, "pt-BR")
-            );
-          }
-
-          return a.nome.localeCompare(b.nome, "pt-BR");
-        }),
-    [jogadoresMensais]
+    () => [...goleirosMensaisRpc],
+    [goleirosMensaisRpc]
   );
 
   const goleirosExibidos =

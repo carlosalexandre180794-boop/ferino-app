@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
-import {
-  validarSenhaAdmin,
-  ativarModoAdmin,
-  adminEstaAtivo,
-  desativarModoAdmin,
-} from "../auth/adminAuth";
+import AdminLogin from "../components/AdminLogin";
+import { adminEstaAtivo, desativarModoAdmin } from "../auth/adminAuth";
 
 function TrocaDefinitiva() {
  
   const [isAdmin, setIsAdmin] = useState(adminEstaAtivo());
-  const [senhaDigitada, setSenhaDigitada] = useState("");
 
   const [temporadas, setTemporadas] = useState([]);
   const [temporadaId, setTemporadaId] = useState("");
@@ -168,26 +163,9 @@ if (temporadaAtual) {
 
   const ehGoleiro =
     jogadorSelecionado?.jogadores?.goleiro === true;
-function verificarSenhaAdmin(evento) {
-  evento.preventDefault();
-
-  if (validarSenhaAdmin(senhaDigitada)) {
-    ativarModoAdmin();
-    setIsAdmin(true);
-    setSenhaDigitada("");
-    setMensagem("");
-    return;
-  }
-
-  alert(
-    "Acesso negado! Apenas administradores podem realizar trocas definitivas."
-  );
-}
-
 function sairDoModoAdmin() {
   desativarModoAdmin();
   setIsAdmin(false);
-  setSenhaDigitada("");
   setMensagem("");
 }
   // =========================================================
@@ -327,87 +305,19 @@ function sairDoModoAdmin() {
   }
 if (!isAdmin) {
   return (
-    <main
-      style={{
-        padding: "20px",
-        textAlign: "center",
-        color: "#fff",
-      }}
-    >
-      <section style={{ marginBottom: "16px" }}>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: "1.7rem",
-          }}
-        >
-          Troca definitiva
-        </h2>
-      </section>
-
-      <form
-        onSubmit={verificarSenhaAdmin}
-        style={{
-          background: "#1e1e24",
-          padding: "20px",
-          borderRadius: "8px",
-          maxWidth: "400px",
-          margin: "0 auto",
-          border: "1px solid #333",
+    <main style={{ padding: "20px", color: "#fff" }}>
+      <AdminLogin
+        titulo="Troca definitiva"
+        descricao="Acesse a área administrativa para realizar trocas definitivas de membros."
+        onLiberado={() => {
+          setIsAdmin(true);
+          setMensagem("");
         }}
-      >
-        <label
-          htmlFor="senha-admin-troca"
-          style={{
-            display: "block",
-            color: "#aaa",
-            marginBottom: "10px",
-          }}
-        >
-          Digite a senha de administrador
-        </label>
-
-        <input
-          id="senha-admin-troca"
-          type="password"
-          placeholder="Senha..."
-          value={senhaDigitada}
-          onChange={(evento) =>
-            setSenhaDigitada(evento.target.value)
-          }
-          autoComplete="current-password"
-          style={{
-            width: "100%",
-            padding: "8px 10px",
-            background: "#2a2a32",
-            border: "1px solid #444",
-            color: "#fff",
-            borderRadius: "4px",
-            marginBottom: "14px",
-            boxSizing: "border-box",
-            textAlign: "center",
-          }}
-        />
-
-        <button
-          type="submit"
-          style={{
-            width: "100%",
-            padding: "8px 10px",
-            background: "#4f46e5",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          Entrar
-        </button>
-      </form>
+      />
     </main>
   );
 }
+
   // =========================================================
   // CARREGANDO
   // =========================================================

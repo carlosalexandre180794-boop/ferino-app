@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { NativeBiometric } from "@capgo/capacitor-native-biometric";
+
 import {
   ativarModoAdmin,
   validarSenhaAdmin,
 } from "../auth/adminAuth";
+
+const CHAVE_BIOMETRIA_ADMIN =
+  "ferino_biometria_admin_ativada";
 
 function AdminLogin({
   onLiberado,
@@ -15,7 +20,86 @@ function AdminLogin({
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
 
-  function entrar(evento) {
+  const [biometriaDisponivel, setBiometriaDisponivel] =
+    useState(false);
+
+  const [biometriaAtivada, setBiometriaAtivada] =
+    useState(
+      localStorage.getItem(CHAVE_BIOMETRIA_ADMIN) ===
+        "true"
+    );
+
+  useEffect(() => {
+    verificarBiometria();
+  }, []);
+
+  async function verificarBiometria() {
+    try {
+      const resultado =
+        await NativeBiometric.isAvailable();
+
+      setBiometriaDisponivel(
+        Boolean(resultado?.isAvailable)
+      );
+    } catch (error) {
+      console.log(
+        "Biometria não disponível:",
+        error
+      );
+
+      setBiometriaDisponivel(false);
+    }
+  }
+
+  function liberarAdmin() {
+    ativarModoAdmin();
+
+    if (typeof onLiberado === "function") {
+      onLiberado();
+    }
+  }
+
+  async function oferecerAtivacaoBiometrica() {
+    if (!biometriaDisponivel) {
+      return;
+    }
+
+    const desejaAtivar = window.confirm(
+      "Deseja ativar o acesso por digital neste aparelho?"
+    );
+
+    if (!desejaAtivar) {
+      return;
+    }
+
+    try {
+      await NativeBiometric.verifyIdentity({
+        reason:
+          "Confirme sua digital para ativar o acesso administrativo.",
+        title: "Ferino Pé de Pano",
+        subtitle: "Ativar acesso por digital",
+        negativeButtonText: "Cancelar",
+      });
+
+      localStorage.setItem(
+        CHAVE_BIOMETRIA_ADMIN,
+        "true"
+      );
+
+      setBiometriaAtivada(true);
+    } catch (error) {
+      console.log(
+        "Ativação da biometria cancelada ou falhou:",
+        error
+      );
+
+      window.alert(
+        "Não foi possível ativar a digital. Você poderá continuar usando a senha."
+      );
+    }
+  }
+
+  async function entrar(evento) {
     evento.preventDefault();
 
     if (carregando) return;
@@ -23,18 +107,66 @@ function AdminLogin({
     setErro("");
 
     if (!validarSenhaAdmin(senha)) {
-      setErro("Senha incorreta. Acesso não autorizado.");
+      setErro(
+        "Senha incorreta. Acesso não autorizado."
+      );
       return;
     }
 
     setCarregando(true);
-    ativarModoAdmin();
 
-    if (typeof onLiberado === "function") {
-      onLiberado();
+    try {
+      if (
+        biometriaDisponivel &&
+        !biometriaAtivada
+      ) {
+        await oferecerAtivacaoBiometrica();
+      }
+
+      liberarAdmin();
+    } finally {
+      setCarregando(false);
     }
+  }
 
-    setCarregando(false);
+  async function entrarComBiometria() {
+    if (carregando) return;
+
+    setErro("");
+    setCarregando(true);
+
+    try {
+      const resultado =
+        await NativeBiometric.isAvailable();
+
+      if (!resultado?.isAvailable) {
+        setErro(
+          "A biometria não está disponível neste aparelho. Use a senha."
+        );
+        return;
+      }
+
+      await NativeBiometric.verifyIdentity({
+        reason:
+          "Use sua digital para acessar a área administrativa.",
+        title: "Ferino Pé de Pano",
+        subtitle: "Área administrativa",
+        negativeButtonText: "Usar senha",
+      });
+
+      liberarAdmin();
+    } catch (error) {
+      console.log(
+        "Autenticação biométrica cancelada ou recusada:",
+        error
+      );
+
+      setErro(
+        "Digital não reconhecida ou autenticação cancelada. Você pode usar a senha."
+      );
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
@@ -47,16 +179,73 @@ function AdminLogin({
         background: "#111827",
         border: "1px solid #3b2d15",
         borderRadius: "16px",
-        boxShadow: "0 18px 45px rgba(0,0,0,.35)",
+        boxShadow:
+          "0 18px 45px rgba(0,0,0,.35)",
       }}
     >
-      <h2 style={{ margin: "0 0 8px", color: "#fff" }}>
+      <h2
+        style={{
+          margin: "0 0 8px",
+          color: "#fff",
+        }}
+      >
         {titulo}
       </h2>
 
-      <p style={{ margin: "0 0 22px", color: "#94a3b8", lineHeight: 1.5 }}>
+      <p
+        style={{
+          margin: "0 0 22px",
+          color: "#94a3b8",
+          lineHeight: 1.5,
+        }}
+      >
         {descricao}
       </p>
+
+      {biometriaAtivada &&
+        biometriaDisponivel && (
+          <button
+            type="button"
+            onClick={entrarComBiometria}
+            disabled={carregando}
+            style={{
+              width: "100%",
+              padding: "14px",
+              marginBottom: "18px",
+              border:
+                "1px solid #d3a632",
+              borderRadius: "10px",
+              background: "#5b4215",
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "16px",
+              cursor: carregando
+                ? "not-allowed"
+                : "pointer",
+              opacity: carregando
+                ? 0.6
+                : 1,
+            }}
+          >
+            {carregando
+              ? "Verificando..."
+              : "👆 Entrar com digital"}
+          </button>
+        )}
+
+      {biometriaAtivada &&
+        biometriaDisponivel && (
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "18px",
+              color: "#64748b",
+              fontSize: "13px",
+            }}
+          >
+            ou use sua senha
+          </div>
+        )}
 
       <form onSubmit={entrar}>
         <label
@@ -81,11 +270,13 @@ function AdminLogin({
           }}
           placeholder="Digite a senha"
           autoComplete="current-password"
-          autoFocus
+          autoFocus={!biometriaAtivada}
           style={{
             width: "100%",
             padding: "14px",
-            border: erro ? "1px solid #ef4444" : "1px solid #4b5563",
+            border: erro
+              ? "1px solid #ef4444"
+              : "1px solid #4b5563",
             borderRadius: "10px",
             background: "#0b1220",
             color: "#fff",
@@ -95,7 +286,13 @@ function AdminLogin({
         />
 
         {erro && (
-          <p style={{ margin: "10px 0 0", color: "#fca5a5", fontSize: "14px" }}>
+          <p
+            style={{
+              margin: "10px 0 0",
+              color: "#fca5a5",
+              fontSize: "14px",
+            }}
+          >
             {erro}
           </p>
         )}
@@ -108,16 +305,19 @@ function AdminLogin({
             marginTop: "22px",
           }}
         >
-          {typeof onCancelar === "function" && (
+          {typeof onCancelar ===
+            "function" && (
             <button
               type="button"
               onClick={onCancelar}
               disabled={carregando}
               style={{
                 padding: "11px 16px",
-                border: "1px solid #4b5563",
+                border:
+                  "1px solid #4b5563",
                 borderRadius: "9px",
-                background: "transparent",
+                background:
+                  "transparent",
                 color: "#fff",
                 cursor: "pointer",
               }}
@@ -128,25 +328,33 @@ function AdminLogin({
 
           <button
             type="submit"
-            disabled={carregando || senha.trim() === ""}
+            disabled={
+              carregando ||
+              senha.trim() === ""
+            }
             style={{
               padding: "11px 18px",
-              border: "1px solid #d3a632",
+              border:
+                "1px solid #d3a632",
               borderRadius: "9px",
               background: "#5b4215",
               color: "#fff",
               fontWeight: "bold",
               cursor:
-                carregando || senha.trim() === ""
+                carregando ||
+                senha.trim() === ""
                   ? "not-allowed"
                   : "pointer",
               opacity:
-                carregando || senha.trim() === ""
+                carregando ||
+                senha.trim() === ""
                   ? 0.55
                   : 1,
             }}
           >
-            {carregando ? "Entrando..." : "Entrar como administrador"}
+            {carregando
+              ? "Entrando..."
+              : "Entrar como administrador"}
           </button>
         </div>
       </form>
