@@ -27,6 +27,7 @@ const LISTA_MESES = [
 
 function Estatisticas() {
   const [jogadoresMensais, setJogadoresMensais] = useState([]);
+  const [artilheirosMensaisRpc, setArtilheirosMensaisRpc] = useState([]);
   const [artilheirosAnuais, setArtilheirosAnuais] = useState([]);
   const [goleirosAnuais, setGoleirosAnuais] = useState([]);
   const [goleirosMensaisRpc, setGoleirosMensaisRpc] = useState([]);
@@ -60,16 +61,23 @@ function Estatisticas() {
         if (erroTemporada) throw erroTemporada;
 
         const consultas = [
-          supabase.rpc("artilharia_anual", {
-            p_ano: anoAtivo,
-          }),
-          supabase.rpc("goleiros_anual", {
-            p_ano: anoAtivo,
-          }),
-          supabase.rpc("goleiros_mensal", {
-            p_ano: anoAtivo,
-            p_mes: mesAtivo,
-          }),
+  supabase.rpc("artilharia_mensal", {
+    p_ano: anoAtivo,
+    p_mes: mesAtivo,
+  }),
+
+  supabase.rpc("artilharia_anual", {
+    p_ano: anoAtivo,
+  }),
+
+  supabase.rpc("goleiros_anual", {
+    p_ano: anoAtivo,
+  }),
+
+  supabase.rpc("goleiros_mensal", {
+    p_ano: anoAtivo,
+    p_mes: mesAtivo,
+  }),
           supabase
             .from("jogadores")
             .select(`
@@ -120,15 +128,17 @@ function Estatisticas() {
             }
 
         const [
-          respostaMensal,
-          respostaArtilhariaAnual,
-          respostaGoleirosAnual,
-          respostaGoleirosMensal,
-          respostaJogadoresAtuais,
-          respostaTimesAtuais,
-        ] = await Promise.all(consultas);
+  respostaMensal,
+  respostaArtilhariaMensal,
+  respostaArtilhariaAnual,
+  respostaGoleirosAnual,
+  respostaGoleirosMensal,
+  respostaJogadoresAtuais,
+  respostaTimesAtuais,
+] = await Promise.all(consultas);
 
         if (respostaMensal.error) throw respostaMensal.error;
+        if (respostaArtilhariaMensal.error) throw respostaArtilhariaMensal.error;
         if (respostaArtilhariaAnual.error) throw respostaArtilhariaAnual.error;
         if (respostaGoleirosAnual.error) throw respostaGoleirosAnual.error;
         if (respostaGoleirosMensal.error) throw respostaGoleirosMensal.error;
@@ -200,6 +210,18 @@ function Estatisticas() {
               ? listaMensalAtual
               : [];
 
+          const listaArtilhariaMensal = (
+  respostaArtilhariaMensal.data || []
+)
+  .map((jogador) => ({
+    id: jogador.id,
+    nome: jogador.nome,
+    time: jogador.nome_time || "Sem time",
+    gols: Number(jogador.gols || 0),
+    jogos: Number(jogador.jogos || 0),
+  }))
+  .filter((jogador) => jogador.gols > 0);    
+
         const listaArtilhariaAnual = (
           respostaArtilhariaAnual.data || []
         )
@@ -248,6 +270,7 @@ function Estatisticas() {
           .filter((goleiro) => goleiro.jogosGoleiro > 0);
 
         setJogadoresMensais(listaMensal);
+        setArtilheirosMensaisRpc(listaArtilhariaMensal);
         setArtilheirosAnuais(listaArtilhariaAnual);
         setGoleirosMensaisRpc(listaGoleirosMensalRpc);
         setGoleirosAnuais(listaGoleirosAnual);
@@ -266,9 +289,10 @@ function Estatisticas() {
       } catch (erro) {
         console.error("Erro ao carregar estatísticas:", erro);
         setJogadoresMensais([]);
-        setArtilheirosAnuais([]);
-        setGoleirosMensaisRpc([]);
-        setGoleirosAnuais([]);
+setArtilheirosMensaisRpc([]);
+setArtilheirosAnuais([]);
+setGoleirosMensaisRpc([]);
+setGoleirosAnuais([]);
         setMensagem(`Erro ao carregar as estatísticas: ${erro.message}`);
       } finally {
         setCarregando(false);
@@ -279,19 +303,9 @@ function Estatisticas() {
   }, [anoAtivo, mesAtivo]);
   // CORREÇÃO: Removido o !jogador.goleiro para permitir goleiros marcarem gols na artilharia geral
   const artilheirosMensais = useMemo(
-    () =>
-      [...jogadoresMensais]
-        .filter((jogador) => jogador.gols > 0)
-        .sort(
-          (a, b) =>
-            b.gols - a.gols ||
-            b.pontosTime - a.pontosTime ||
-            b.saldoTime - a.saldoTime ||
-            b.golsProTime - a.golsProTime ||
-            a.nome.localeCompare(b.nome, "pt-BR")
-        ),
-    [jogadoresMensais]
-  );
+  () => [...artilheirosMensaisRpc],
+  [artilheirosMensaisRpc]
+);
 
   const artilheirosExibidos =
     filtroArtilharia === "mes"
