@@ -6,18 +6,9 @@ function GoleiroMes({
   artilheiro,
   tituloCustomizado, 
 }) {
-  // Goleiro padrão para recuperação de dados caso o estado pai esteja vazio
-  const goleiroPadrao = {
-    nome: "Admilson",
-    time: "Grêmio",
-    jogosGoleiro: 6,
-    golsSofridos: 1
-  };
-
-  // Se for goleiro e não vier dados, assume o Admilson como destaque temporário
-  const destaque = tipo === "artilheiro" 
-    ? artilheiro 
-    : (goleiro || goleiroPadrao);
+  const destaque = tipo === "artilheiro"
+  ? artilheiro
+  : goleiro;
 
   const titulo = tituloCustomizado 
     ? `${tipo === "artilheiro" ? "⚽" : "👑"} ${tituloCustomizado.toUpperCase()}`
